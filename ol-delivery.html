@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
+  <meta name="theme-color" content="#b22025">
+  <title>Bloom Online — Delivery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bloom:#b22025; --bloom-dark:#8b191d; --bloom-light:#fdf2f2;
+      --bg:#f6f6f8; --surface:#ffffff; --border:#e5e7eb;
+      --text:#1a1a2e; --muted:#6b7280;
+      --success:#16a34a; --error:#dc2626; --info:#2563eb; --warning:#d97706;
+      --radius:12px; --radius-lg:20px; --radius-full:100px;
+      --shadow:0 2px 12px rgba(0,0,0,0.07); --shadow-md:0 4px 20px rgba(0,0,0,0.10);
+    }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; min-height:100dvh; padding-bottom:80px; -webkit-tap-highlight-color:transparent; -webkit-font-smoothing:antialiased; }
+
+    /* ── Login ── */
+    #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .login-card { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-md); padding:40px 32px; width:100%; max-width:360px; text-align:center; }
+    .login-logo-img { width:110px; height:auto; margin-bottom:16px; filter:drop-shadow(0 2px 8px rgba(178,32,37,.18)); }
+    .login-badge { display:inline-flex; align-items:center; gap:6px; background:var(--bloom-light); color:var(--bloom); font-size:11px; font-weight:700; padding:4px 12px; border-radius:var(--radius-full); margin-bottom:14px; letter-spacing:.4px; }
+    .login-card h1 { font-family:'Sora',sans-serif; font-size:21px; font-weight:700; margin-bottom:6px; }
+    .login-card p { color:var(--muted); font-size:14px; margin-bottom:24px; }
+    .pin-input { width:100%; padding:15px; font-size:22px; letter-spacing:8px; text-align:center; border:2px solid var(--border); border-radius:var(--radius-full); outline:none; font-family:'Sora',sans-serif; transition:border-color .2s; }
+    .pin-input:focus { border-color:var(--bloom); box-shadow:0 0 0 3px rgba(178,32,37,.10); }
+    .btn-primary { width:100%; padding:15px; background:var(--bloom); color:#fff; border:none; border-radius:var(--radius-full); font-family:'Sora',sans-serif; font-size:15px; font-weight:600; cursor:pointer; margin-top:12px; box-shadow:0 4px 16px rgba(178,32,37,.25); transition:background .2s; }
+    .btn-primary:hover { background:var(--bloom-dark); }
+    .error-msg { color:var(--error); font-size:13px; margin-top:10px; display:none; font-weight:500; }
+
+    /* ── Agent select step ── */
+    .agent-select-card { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-md); padding:32px 28px; width:100%; max-width:360px; text-align:center; }
+    .agent-select-card h2 { font-family:'Sora',sans-serif; font-size:19px; font-weight:700; margin-bottom:6px; }
+    .agent-select-card p { color:var(--muted); font-size:14px; margin-bottom:20px; }
+    .agent-grid { display:flex; flex-direction:column; gap:8px; text-align:left; margin-bottom:18px; }
+    .agent-option { display:flex; align-items:center; padding:13px 16px; background:var(--bg); border:2px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:all .15s; font-size:14px; font-weight:600; font-family:'Sora',sans-serif; }
+    .agent-option:hover { border-color:var(--bloom); background:var(--bloom-light); color:var(--bloom); }
+    .agent-option.selected { border-color:var(--bloom); background:var(--bloom); color:#fff; }
+    .agent-option-icon { font-size:20px; margin-right:12px; }
+    .btn-continue { width:100%; padding:14px; background:var(--success); color:#fff; border:none; border-radius:var(--radius-full); font-family:'Sora',sans-serif; font-size:15px; font-weight:600; cursor:pointer; box-shadow:0 4px 14px rgba(22,163,74,.25); transition:background .2s; }
+    .btn-continue:hover:not(:disabled) { background:#15803d; }
+    .btn-continue:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+    .btn-back { background:none; border:none; color:var(--muted); font-size:13px; cursor:pointer; margin-top:10px; font-family:'DM Sans',sans-serif; }
+    .btn-back:hover { color:var(--text); }
+
+    /* ── Top bar ── */
+    #main-app { display:none; }
+    .top-bar { background:var(--surface); padding:12px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); position:sticky; top:0; z-index:100; }
+    .top-bar-left { display:flex; align-items:center; gap:10px; }
+    .top-bar-logo img { width:34px; height:34px; object-fit:contain; border-radius:8px; }
+    .top-bar-info { display:flex; flex-direction:column; }
+    .top-bar-name { font-family:'Sora',sans-serif; font-size:14px; font-weight:700; }
+    .top-bar-role { font-size:11px; color:var(--bloom); font-weight:600; margin-top:1px; }
+    .top-bar-date { font-size:11px; color:var(--muted); }
+    .btn-logout { padding:7px 14px; background:transparent; border:1.5px solid var(--border); border-radius:var(--radius-full); font-size:12px; color:var(--muted); cursor:pointer; transition:all .2s; }
+    .btn-logout:hover { border-color:var(--error); color:var(--error); }
+
+    /* ── Container ── */
+    .container { max-width:540px; margin:0 auto; padding:16px; }
+
+    /* ── Status summary chips ── */
+    .status-bar { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .status-chip { flex:1; min-width:80px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:10px 12px; text-align:center; }
+    .status-chip .chip-count { font-family:'Sora',sans-serif; font-size:20px; font-weight:700; display:block; }
+    .status-chip .chip-label { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+    .chip-total .chip-count { color:var(--text); }
+    .chip-pending .chip-count { color:var(--info); }
+    .chip-delivered .chip-count { color:var(--success); }
+    .chip-returned .chip-count { color:var(--error); }
+
+    /* ── Scan panel ── */
+    .scan-section { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:18px; margin-bottom:14px; }
+    .scan-title { font-family:'Sora',sans-serif; font-size:14px; font-weight:700; margin-bottom:12px; }
+    .scanner-wrap { position:relative; width:100%; aspect-ratio:16/9; background:#111; border-radius:var(--radius); overflow:hidden; margin-bottom:10px; display:none; }
+    #video-feed { width:100%; height:100%; object-fit:cover; }
+    .scan-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+    .scan-box { width:70%; height:42%; border:2px solid var(--bloom); border-radius:var(--radius); box-shadow:0 0 0 9999px rgba(0,0,0,.50); position:relative; overflow:hidden; }
+    .scan-line { position:absolute; left:0; right:0; height:2px; background:var(--bloom); animation:scanAnim 2s ease-in-out infinite; }
+    @keyframes scanAnim { 0%,100%{top:8%} 50%{top:88%} }
+    .scan-input-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .scan-input { flex:1; padding:12px 14px; border:1.5px solid var(--border); border-radius:var(--radius); font-size:15px; font-family:'DM Sans',sans-serif; outline:none; transition:border-color .2s; }
+    .scan-input:focus { border-color:var(--bloom); }
+    .scan-input.scanned { border-color:var(--success); background:#f0fdf4; font-weight:600; color:#15803d; }
+    .btn-cam { padding:11px 14px; background:var(--text); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; display:flex; align-items:center; gap:5px; font-size:12px; font-family:'Sora',sans-serif; font-weight:600; transition:background .2s; white-space:nowrap; }
+    .btn-cam.cam-on { background:var(--bloom); }
+    .btn-cam svg { width:16px; height:16px; flex-shrink:0; }
+
+    /* ── Order detail card ── */
+    .order-detail { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-md); padding:18px; margin-bottom:14px; display:none; animation:fadeUp .2s ease; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+    .order-detail-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
+    .order-id { font-family:monospace; font-size:20px; font-weight:700; color:var(--text); }
+    .order-status-badge { font-size:12px; font-weight:600; padding:4px 12px; border-radius:var(--radius-full); }
+    .order-info-row { display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px solid var(--border); color:var(--muted); }
+    .order-info-row:last-of-type { border-bottom:none; }
+    .order-info-val { font-weight:600; color:var(--text); text-align:right; }
+
+    /* ── Action buttons ── */
+    .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+    .btn-delivered { padding:16px; background:var(--success); color:#fff; border:none; border-radius:var(--radius-lg); font-family:'Sora',sans-serif; font-size:14px; font-weight:700; cursor:pointer; transition:background .2s; box-shadow:0 3px 12px rgba(22,163,74,.25); display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .btn-delivered:hover:not(:disabled) { background:#15803d; }
+    .btn-returned { padding:16px; background:#fee2e2; color:var(--error); border:1.5px solid #fca5a5; border-radius:var(--radius-lg); font-family:'Sora',sans-serif; font-size:14px; font-weight:700; cursor:pointer; transition:background .2s; display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .btn-returned:hover:not(:disabled) { background:#fecaca; }
+    .btn-delivered:disabled, .btn-returned:disabled { opacity:.45; cursor:not-allowed; }
+    .btn-icon { font-size:22px; }
+
+    /* ── Notes input ── */
+    .notes-wrap { margin-top:10px; }
+    .notes-input { width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:'DM Sans',sans-serif; outline:none; resize:none; transition:border-color .2s; }
+    .notes-input:focus { border-color:var(--bloom); }
+
+    /* ── Order list (today's run) ── */
+    .orders-section { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:16px; }
+    .orders-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .orders-title { font-family:'Sora',sans-serif; font-size:14px; font-weight:700; }
+    .filter-btns { display:flex; gap:6px; }
+    .filter-btn { padding:5px 12px; background:var(--bg); border:1.5px solid var(--border); border-radius:var(--radius-full); font-size:11px; font-weight:600; cursor:pointer; transition:all .15s; color:var(--muted); }
+    .filter-btn.active { background:var(--bloom); border-color:var(--bloom); color:#fff; }
+    .order-item { display:flex; justify-content:space-between; align-items:center; padding:11px 12px; background:var(--bg); border-radius:var(--radius); border:1.5px solid var(--border); margin-bottom:6px; cursor:pointer; transition:all .15s; }
+    .order-item:hover { border-color:var(--bloom); background:var(--bloom-light); }
+    .order-item.status-handed { border-left:4px solid var(--info); }
+    .order-item.status-delivered { border-left:4px solid var(--success); opacity:.7; }
+    .order-item.status-returned { border-left:4px solid var(--error); opacity:.7; }
+    .order-item-id { font-family:monospace; font-size:14px; font-weight:700; }
+    .order-item-zone { font-size:11px; color:var(--muted); margin-top:2px; }
+    .status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .dot-handed { background:var(--info); }
+    .dot-delivered { background:var(--success); }
+    .dot-returned { background:var(--error); }
+
+    /* ── Shared ── */
+    .empty-state { text-align:center; padding:32px 16px; color:var(--muted); font-size:14px; }
+    .loader-overlay { position:fixed; inset:0; background:rgba(255,255,255,.88); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+    .loader-overlay.show { display:flex; }
+    .spinner { width:44px; height:44px; border:3px solid var(--border); border-top-color:var(--bloom); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .loader-text { margin-top:14px; font-family:'Sora',sans-serif; font-size:14px; font-weight:600; color:var(--muted); }
+    .toast-wrap { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; width:90%; max-width:380px; }
+    .toast { padding:12px 20px; border-radius:var(--radius-full); font-family:'Sora',sans-serif; font-size:13px; font-weight:600; color:#fff; text-align:center; animation:tIn .25s ease, tOut .3s ease 2.7s forwards; }
+    .toast.success{background:var(--success)} .toast.error{background:var(--error)} .toast.info{background:var(--info)} .toast.warning{background:var(--warning)}
+    @keyframes tIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+    @keyframes tOut{to{opacity:0;transform:translateY(-8px)}}
+
+    @media (max-width:400px) {
+      .action-grid { grid-template-columns:1fr; }
+      .status-bar { flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="loader-overlay" id="loader"><div class="spinner"></div><div class="loader-text" id="loader-text">Loading…</div></div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- ── Step 1: Login ──────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div id="login-step" class="login-card">
+    <img src="https://bloompharmacy.github.io/bloom-delivery/B-big-logo.png" alt="Bloom" class="login-logo-img">
+    <div class="login-badge">🚴 Delivery App</div>
+    <h1>Bloom Online Delivery</h1>
+    <p>Enter your passcode to continue</p>
+    <input type="password" class="pin-input" id="passcode-input"
+           inputmode="numeric" maxlength="10" placeholder="••••"
+           autocomplete="one-time-code" data-form-type="other" name="passcode-otp">
+    <button class="btn-primary" id="unlock-btn">Continue →</button>
+    <div class="error-msg" id="login-error">Invalid passcode. Please try again.</div>
+  </div>
+
+  <!-- ── Step 2: Pick agent ── -->
+  <div id="agent-step" class="agent-select-card" style="display:none">
+    <img src="https://bloompharmacy.github.io/bloom-delivery/B-big-logo.png" alt="Bloom" class="login-logo-img">
+    <h2>Who are you delivering today?</h2>
+    <p>Select your driver name</p>
+    <div class="agent-grid" id="agent-grid">
+      <div class="empty-state" style="padding:16px">Loading agents…</div>
+    </div>
+    <button class="btn-continue" id="btn-continue" disabled>Start Deliveries →</button>
+    <div><button class="btn-back" id="btn-back">← Back</button></div>
+  </div>
+</div>
+
+<!-- ── Main App ───────────────────────────────────────────────────────────── -->
+<div id="main-app">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="top-bar-logo"><img src="https://bloompharmacy.github.io/bloom-delivery/B-big-logo.png" alt="Bloom"></div>
+      <div class="top-bar-info">
+        <div class="top-bar-name" id="display-agent"></div>
+        <div class="top-bar-role">Online Delivery</div>
+        <div class="top-bar-date" id="display-date"></div>
+      </div>
+    </div>
+    <button class="btn-logout" id="logout-btn">Logout</button>
+  </div>
+
+  <div class="container">
+
+    <!-- Status summary -->
+    <div class="status-bar" id="status-bar">
+      <div class="status-chip chip-total"><span class="chip-count" id="ct-total">0</span><span class="chip-label">Total</span></div>
+      <div class="status-chip chip-pending"><span class="chip-count" id="ct-pending">0</span><span class="chip-label">Pending</span></div>
+      <div class="status-chip chip-delivered"><span class="chip-count" id="ct-delivered">0</span><span class="chip-label">Delivered</span></div>
+      <div class="status-chip chip-returned"><span class="chip-count" id="ct-returned">0</span><span class="chip-label">Returned</span></div>
+    </div>
+
+    <!-- Scan / search panel -->
+    <div class="scan-section">
+      <div class="scan-title">📦 Find Order</div>
+      <div class="scanner-wrap" id="scanner-wrap">
+        <video id="video-feed" autoplay playsinline muted></video>
+        <div class="scan-overlay"><div class="scan-box"><div class="scan-line"></div></div></div>
+      </div>
+      <div class="scan-input-row">
+        <input type="text" inputmode="numeric" class="scan-input" id="order-input"
+               placeholder="Scan or type order ID…" autocomplete="off">
+        <button class="btn-cam" id="btn-cam" title="Camera">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          Scan
+        </button>
+      </div>
+    </div>
+
+    <!-- Order detail + confirmation -->
+    <div class="order-detail" id="order-detail">
+      <div class="order-detail-header">
+        <div class="order-id" id="od-order-id">—</div>
+        <span class="order-status-badge s-handed" id="od-status-badge">Pending</span>
+      </div>
+      <div class="order-info-row"><span>Agent</span><span class="order-info-val" id="od-agent">—</span></div>
+      <div class="order-info-row"><span>Op. Zone</span><span class="order-info-val" id="od-zone">—</span></div>
+      <div class="order-info-row"><span>Run Sheet</span><span class="order-info-val" id="od-batch" style="font-family:monospace;font-size:12px">—</span></div>
+      <div class="order-info-row"><span>Handed at</span><span class="order-info-val" id="od-time">—</span></div>
+
+      <div class="notes-wrap">
+        <textarea class="notes-input" id="confirm-notes" rows="2" placeholder="Notes (optional)…"></textarea>
+      </div>
+
+      <div class="action-grid" id="action-grid">
+        <button class="btn-delivered" id="btn-delivered">
+          <span class="btn-icon">✅</span> Delivered
+        </button>
+        <button class="btn-returned" id="btn-returned">
+          <span class="btn-icon">↩️</span> Returned
+        </button>
+      </div>
+      <div id="done-msg" style="display:none;text-align:center;padding:12px;background:#f0fdf4;border-radius:var(--radius);color:var(--success);font-weight:600;font-size:14px;margin-top:10px"></div>
+    </div>
+
+    <!-- Today's order list -->
+    <div class="orders-section">
+      <div class="orders-header">
+        <div class="orders-title">Today's Run</div>
+        <div class="filter-btns">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="handed">Pending</button>
+          <button class="filter-btn" data-filter="delivered">Done</button>
+          <button class="filter-btn" data-filter="returned">Returned</button>
+        </div>
+      </div>
+      <div id="orders-list"><div class="empty-state">Loading today's orders…</div></div>
+    </div>
+
+  </div><!-- /container -->
+</div><!-- /main-app -->
+
+<script type="module">
+console.log('[Bloom OL Delivery] Build: 2026-05-19 — v1.0.0');
+
+import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, getDocs, updateDoc, collection,
+         query, where, orderBy, limit, serverTimestamp,
+         Timestamp, enableIndexedDbPersistence, onSnapshot }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAnalytics }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
+
+// ── Firebase — dedicated Bloom Online Delivery project ────────────────────────
+const app = initializeApp({
+  apiKey:            "AIzaSyBnotQTRCsolWRY8OkQUjb68RV6N-alZg4",
+  authDomain:        "bloom-online-delivery.firebaseapp.com",
+  projectId:         "bloom-online-delivery",
+  storageBucket:     "bloom-online-delivery.firebasestorage.app",
+  messagingSenderId: "1083336380275",
+  appId:             "1:1083336380275:web:a8e80a8e4de6e6a40ebf06",
+  measurementId:     "G-VPT8W9WNHF"
+});
+const db        = getFirestore(app);
+const auth      = getAuth(app);
+const analytics = getAnalytics(app);
+
+try { await enableIndexedDbPersistence(db); } catch(e) {}
+await signInAnonymously(auth);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const OL_STORE_ID = 'online';
+const ALLOWED_ROLES = ['super_admin', 'store_admin', 'staff', 'driver', 'delivery'];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let session        = null;   // { passcode, username, role }
+let selectedAgent  = null;   // { id, name }
+let allOrders      = [];     // today's orders for the agent
+let currentOrder   = null;   // the order currently shown in detail panel
+let activeFilter   = 'all';
+let codeReader     = null;
+let currentStream  = null;
+let cameraOpen     = false;
+let lastScanned    = '';
+let lastScannedAt  = 0;
+let audioCtx       = null;
+let _heartbeatUnsub = null;
+let _forceLogoutProg = false;
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+document.getElementById('unlock-btn')  .addEventListener('click', handleLogin);
+document.getElementById('passcode-input').addEventListener('keydown', e => { if (e.key==='Enter') handleLogin(); });
+document.getElementById('btn-continue').addEventListener('click', startDeliveries);
+document.getElementById('btn-back')   .addEventListener('click', () => {
+  document.getElementById('agent-step').style.display  = 'none';
+  document.getElementById('login-step').style.display  = 'block';
+  selectedAgent = null;
+});
+document.getElementById('logout-btn') .addEventListener('click', handleLogout);
+document.getElementById('btn-cam')    .addEventListener('click', toggleCamera);
+document.getElementById('btn-delivered').addEventListener('click', () => confirmOrder('delivered'));
+document.getElementById('btn-returned').addEventListener('click',  () => confirmOrder('returned'));
+
+document.getElementById('order-input').addEventListener('input', function() {
+  this.classList.remove('scanned');
+  const v = this.value.trim();
+  if (v && /^\d+$/.test(v)) findOrder(v);
+  else hideOrderDetail();
+});
+document.getElementById('order-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); const v = this.value.trim(); if (v) findOrder(v); }
+});
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    activeFilter = this.dataset.filter;
+    renderOrderList();
+  });
+});
+
+// Session restore
+try {
+  const s = localStorage.getItem('bloom_ol_drv');
+  if (s) {
+    const parsed = JSON.parse(s);
+    session = parsed.session;
+    selectedAgent = parsed.agent;
+    if (session && selectedAgent) bootApp();
+  }
+} catch(e) {}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function localDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function beep() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.value = 1046; osc.type = 'sine';
+    gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+    osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.22);
+  } catch(e) {}
+}
+function vibrate() { try { if (navigator.vibrate) navigator.vibrate([60,30,40]); } catch(e) {} }
+
+// ── Authentication ────────────────────────────────────────────────────────────
+async function handleLogin() {
+  const passcode = document.getElementById('passcode-input').value.trim();
+  if (!passcode) return;
+  showLoader('Verifying…');
+  try {
+    const snap = await getDoc(doc(db, 'users', passcode));
+    if (!snap.exists()) { hideLoader(); showLoginError('Invalid passcode.'); return; }
+    const ud = snap.data();
+    if ((ud.status || 'active') !== 'active') { hideLoader(); showLoginError('Account deactivated.'); return; }
+    if (ud.role !== 'super_admin' && ud.store_id !== OL_STORE_ID) {
+      hideLoader(); showLoginError('Online store access only.'); return;
+    }
+
+    session = { passcode, username: ud.username || ud.display_name || passcode, role: ud.role };
+    document.getElementById('login-error').style.display = 'none';
+
+    // Load agents for agent selection step
+    const agentsSnap = await getDocs(query(
+      collection(db, 'agents'),
+      where('store_id', '==', OL_STORE_ID),
+      where('status', '==', 'active')
+    ));
+    const agents = agentsSnap.docs.map(d => ({ id: d.id, name: d.data().name }));
+    hideLoader();
+
+    if (!agents.length) {
+      showLoginError('No delivery agents configured. Ask your admin.'); return;
+    }
+
+    // Show agent selection step
+    buildAgentGrid(agents);
+    document.getElementById('login-step').style.display  = 'none';
+    document.getElementById('agent-step').style.display  = 'block';
+  } catch(e) {
+    hideLoader(); showToast('Connection error — try again', 'error');
+  }
+}
+
+function buildAgentGrid(agents) {
+  const grid = document.getElementById('agent-grid');
+  grid.innerHTML = '';
+  agents.forEach(a => {
+    const btn = document.createElement('div');
+    btn.className = 'agent-option';
+    btn.innerHTML = `<span class="agent-option-icon">🚴</span>${a.name}`;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.agent-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedAgent = a;
+      document.getElementById('btn-continue').disabled = false;
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('passcode-input').value = '';
+}
+
+function handleLogout() {
+  stopCamera();
+  stopHeartbeat();
+  try { localStorage.removeItem('bloom_ol_drv'); } catch(e) {}
+  session = null; selectedAgent = null; allOrders = []; currentOrder = null;
+  document.getElementById('main-app').style.display    = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-step').style.display  = 'block';
+  document.getElementById('agent-step').style.display  = 'none';
+  document.getElementById('passcode-input').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+function startDeliveries() {
+  if (!selectedAgent) return;
+  try {
+    localStorage.setItem('bloom_ol_drv', JSON.stringify({ session, agent: selectedAgent }));
+  } catch(e) {}
+  bootApp();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display    = 'block';
+  document.getElementById('display-agent').textContent = selectedAgent.name;
+  document.getElementById('display-date').textContent  = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  startHeartbeat();
+  loadTodaysOrders();
+}
+
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+function startHeartbeat() {
+  stopHeartbeat();
+  if (!session?.passcode) return;
+  _heartbeatUnsub = onSnapshot(doc(db, 'users', session.passcode), snap => {
+    if (!snap.exists()) forceLogout('missing');
+    else if ((snap.data().status || 'active') !== 'active') forceLogout('inactive');
+  }, err => console.warn('[OL Delivery heartbeat]', err?.code));
+}
+function stopHeartbeat() { if (_heartbeatUnsub) { _heartbeatUnsub(); _heartbeatUnsub = null; } }
+function forceLogout(reason) {
+  if (_forceLogoutProg) return; _forceLogoutProg = true; stopHeartbeat(); stopCamera();
+  const msg = reason === 'missing' ? 'Your account no longer exists.' : 'Your account has been deactivated.';
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ title:'Access Revoked', text:msg, icon:'error', confirmButtonText:'OK',
+                allowOutsideClick:false, allowEscapeKey:false })
+      .then(() => { handleLogout(); _forceLogoutProg = false; });
+  } else { alert(msg); handleLogout(); _forceLogoutProg = false; }
+}
+
+// ── Load today's orders ───────────────────────────────────────────────────────
+async function loadTodaysOrders() {
+  showLoader('Loading orders…');
+  const today = localDateStr();
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'ol_handover_log'),
+      where('agent_id',  '==', selectedAgent.id),
+      where('store_id',  '==', OL_STORE_ID),
+      where('date',      '==', today),
+      orderBy('created_at', 'asc'),
+      limit(200)
+    ));
+    allOrders = snap.docs.map(d => ({ _ref: d.ref, id: d.id, ...d.data() }));
+    hideLoader();
+    updateSummary();
+    renderOrderList();
+  } catch(e) {
+    hideLoader();
+    // Fallback without compound index
+    try {
+      showLoader('Fetching orders (fallback)…');
+      const snap2 = await getDocs(query(
+        collection(db, 'ol_handover_log'),
+        where('agent_id', '==', selectedAgent.id),
+        where('store_id', '==', OL_STORE_ID),
+        where('date', '==', today),
+        limit(200)
+      ));
+      allOrders = snap2.docs.map(d => ({ _ref: d.ref, id: d.id, ...d.data() }));
+      hideLoader();
+      updateSummary();
+      renderOrderList();
+    } catch(e2) {
+      hideLoader(); showToast('Failed to load orders — check connection', 'error');
+      console.error('[OL Delivery] loadTodaysOrders:', e2);
+    }
+  }
+}
+
+function updateSummary() {
+  const total     = allOrders.length;
+  const pending   = allOrders.filter(o => o.status === 'handed').length;
+  const delivered = allOrders.filter(o => o.status === 'delivered').length;
+  const returned  = allOrders.filter(o => o.status === 'returned').length;
+  document.getElementById('ct-total').textContent     = total;
+  document.getElementById('ct-pending').textContent   = pending;
+  document.getElementById('ct-delivered').textContent = delivered;
+  document.getElementById('ct-returned').textContent  = returned;
+}
+
+function renderOrderList() {
+  const filtered = activeFilter === 'all'
+    ? allOrders
+    : allOrders.filter(o => o.status === activeFilter);
+
+  const container = document.getElementById('orders-list');
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state">${activeFilter === 'handed' ? 'All orders done! 🎉' : 'No orders'}</div>`;
+    return;
+  }
+  container.innerHTML = filtered.map(o => {
+    const dotClass = o.status === 'delivered' ? 'dot-delivered'
+                   : o.status === 'returned'  ? 'dot-returned'
+                   : 'dot-handed';
+    const statusLabel = o.status === 'delivered' ? 'Delivered'
+                      : o.status === 'returned'  ? 'Returned'
+                      : 'Pending';
+    return `<div class="order-item status-${o.status}" data-id="${o.id}" onclick="selectOrder('${o.id}')">
+      <div>
+        <div class="order-item-id">${o.order_id || o.id}</div>
+        <div class="order-item-zone">${o.op_zone_label || o.op_zone_id || '—'}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">${statusLabel}</span>
+        <div class="status-dot ${dotClass}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Expose to onclick in innerHTML
+window.selectOrder = function(docId) {
+  const order = allOrders.find(o => o.id === docId);
+  if (!order) return;
+  document.getElementById('order-input').value = order.order_id || docId;
+  document.getElementById('order-input').classList.remove('scanned');
+  showOrderDetail(order);
+};
+
+// ── Order lookup & detail ─────────────────────────────────────────────────────
+function findOrder(orderId) {
+  const match = allOrders.find(o => String(o.order_id || o.id) === String(orderId));
+  if (match) { showOrderDetail(match); }
+  else { hideOrderDetail(); showToast('Order not in today\'s run', 'warning'); }
+}
+
+function showOrderDetail(order) {
+  currentOrder = order;
+  const ts = order.created_at?.toDate?.();
+  const timeStr = ts
+    ? ts.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
+    : '—';
+
+  document.getElementById('od-order-id').textContent = order.order_id || order.id;
+  document.getElementById('od-agent').textContent    = order.agent_name || order.agent_id || '—';
+  document.getElementById('od-zone').textContent     = order.op_zone_label || order.op_zone_id || '—';
+  document.getElementById('od-batch').textContent    = order.batch_code || '—';
+  document.getElementById('od-time').textContent     = timeStr;
+  document.getElementById('confirm-notes').value     = '';
+
+  const badge = document.getElementById('od-status-badge');
+  badge.className = 'order-status-badge ' + (
+    order.status === 'delivered' ? 's-delivered' :
+    order.status === 'returned'  ? 's-returned'  : 's-handed'
+  );
+  badge.textContent = order.status === 'delivered' ? 'Delivered'
+                    : order.status === 'returned'  ? 'Returned'
+                    : 'Pending';
+
+  const alreadyDone = order.status === 'delivered' || order.status === 'returned';
+  document.getElementById('btn-delivered').disabled = alreadyDone;
+  document.getElementById('btn-returned').disabled  = alreadyDone;
+  document.getElementById('action-grid').style.display = alreadyDone ? 'none' : 'grid';
+
+  const doneMsg = document.getElementById('done-msg');
+  if (alreadyDone) {
+    doneMsg.style.display = 'block';
+    doneMsg.textContent = order.status === 'delivered'
+      ? '✅ Already marked as delivered'
+      : '↩️ Already marked as returned';
+  } else {
+    doneMsg.style.display = 'none';
+  }
+
+  document.getElementById('order-detail').style.display = 'block';
+  document.getElementById('order-detail').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function hideOrderDetail() {
+  document.getElementById('order-detail').style.display = 'none';
+  currentOrder = null;
+}
+
+// ── Confirm delivery / return ─────────────────────────────────────────────────
+async function confirmOrder(newStatus) {
+  if (!currentOrder) return;
+  if (currentOrder.status === newStatus) {
+    showToast(`Already marked as ${newStatus}`, 'info'); return;
+  }
+  const notes = document.getElementById('confirm-notes').value.trim();
+  const label = newStatus === 'delivered' ? 'Delivered' : 'Returned';
+
+  showLoader(`Saving — ${label}…`);
+  try {
+    const updateData = {
+      status: newStatus,
+      delivery: {
+        status:       newStatus,
+        confirmed_by: session.passcode,
+        confirmed_by_name: session.username,
+        notes,
+        confirmed_at: serverTimestamp(),
+      },
+    };
+    await updateDoc(currentOrder._ref, updateData);
+
+    // Update local state
+    const idx = allOrders.findIndex(o => o.id === currentOrder.id);
+    if (idx !== -1) {
+      allOrders[idx] = { ...allOrders[idx], ...updateData, delivery: { ...updateData.delivery, confirmed_at: new Date() } };
+      currentOrder = allOrders[idx];
+    }
+
+    hideLoader();
+    vibrate(); beep();
+    showToast(`${currentOrder.order_id || currentOrder.id} — ${label} ✓`, 'success');
+
+    updateSummary();
+    renderOrderList();
+    showOrderDetail(currentOrder);  // refresh badge
+
+    // Clear input for next scan
+    setTimeout(() => {
+      document.getElementById('order-input').value = '';
+      document.getElementById('order-input').classList.remove('scanned');
+      hideOrderDetail();
+    }, 1400);
+  } catch(e) {
+    hideLoader(); showToast('Save failed — try again', 'error');
+    console.error('[OL Delivery] confirmOrder:', e);
+  }
+}
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+async function toggleCamera() {
+  if (cameraOpen) { stopCamera(); return; }
+  if (codeReader) { try { codeReader.reset(); } catch(e) {} codeReader = null; }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showToast('Camera not available', 'warning'); return;
+  }
+  if (typeof ZXing === 'undefined' || !ZXing.BrowserMultiFormatReader) {
+    showToast('Scanner library failed to load — refresh', 'error'); return;
+  }
+  let failed = false;
+  try {
+    codeReader = new ZXing.BrowserMultiFormatReader();
+    const constraints = { video: { facingMode:'environment', width:{ideal:1280}, height:{ideal:720} } };
+    codeReader.decodeFromConstraints(constraints, 'video-feed', (result, err) => {
+      if (result) {
+        const text = result.getText(), now = Date.now();
+        if (text === lastScanned && now - lastScannedAt < 800) return;
+        lastScanned = text; lastScannedAt = now;
+        handleScan(text);
+      }
+    });
+    document.getElementById('scanner-wrap').style.display = 'block';
+    document.getElementById('btn-cam').classList.add('cam-on');
+    cameraOpen = true;
+  } catch(err) {
+    failed = true;
+    stopCamera();
+    const n = err?.name || '';
+    if (n === 'NotAllowedError') showToast('Camera permission denied', 'error', 4000);
+    else showToast('Camera failed to start', 'warning', 3000);
+  }
+  if (failed) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    currentStream = stream;
+  } catch(e) {}
+}
+
+function handleScan(text) {
+  const cleaned = text.trim();
+  if (!/^\d+$/.test(cleaned)) { showToast('Invalid barcode', 'warning'); return; }
+  vibrate(); beep();
+  const inp = document.getElementById('order-input');
+  inp.value = cleaned; inp.classList.add('scanned');
+  stopCamera();
+  findOrder(cleaned);
+}
+
+function stopCamera() {
+  try { if (codeReader) { codeReader.reset(); codeReader = null; } } catch(e) {}
+  if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
+  const v = document.getElementById('video-feed');
+  if (v?.srcObject) { try { v.srcObject.getTracks().forEach(t => t.stop()); } catch(e) {} v.srcObject = null; }
+  document.getElementById('scanner-wrap').style.display = 'none';
+  document.getElementById('btn-cam').classList.remove('cam-on');
+  cameraOpen = false;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function showLoader(text) {
+  document.getElementById('loader-text').textContent = text || 'Loading…';
+  document.getElementById('loader').classList.add('show');
+}
+function hideLoader() { document.getElementById('loader').classList.remove('show'); }
+
+function showToast(msg, type = 'info', duration = 3000) {
+  const wrap  = document.getElementById('toast-wrap');
+  const toast = document.createElement('div');
+  toast.className   = `toast ${type}`;
+  toast.textContent = msg;
+  wrap.appendChild(toast);
+  setTimeout(() => toast.remove(), duration + 400);
+}
+</script>
+</body>
+</html>

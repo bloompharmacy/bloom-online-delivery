@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>Bloom Online — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bloom:#b22025; --bloom-dark:#8b191d; --bloom-light:#fdf2f2;
+      --bg:#f6f6f8; --surface:#ffffff; --border:#e5e7eb;
+      --text:#1a1a2e; --muted:#6b7280;
+      --success:#16a34a; --error:#dc2626; --info:#2563eb; --warning:#d97706;
+      --radius:12px; --radius-lg:20px; --radius-full:100px;
+      --shadow:0 2px 12px rgba(0,0,0,0.07); --shadow-md:0 4px 20px rgba(0,0,0,0.10);
+    }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:60px; -webkit-tap-highlight-color:transparent; }
+
+    /* ── Login ── */
+    #login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .login-card { background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-md); padding:40px 32px; width:100%; max-width:380px; text-align:center; }
+    .login-logo-wrap { margin:0 auto 20px; }
+    .login-logo-img { width:140px; height:auto; object-fit:contain; filter:drop-shadow(0 2px 8px rgba(178,32,37,.18)); }
+    .login-badge { display:inline-flex; align-items:center; gap:6px; background:var(--bloom-light); color:var(--bloom); font-size:11px; font-weight:700; padding:4px 12px; border-radius:var(--radius-full); margin-bottom:14px; letter-spacing:.4px; }
+    .login-card h1 { font-family:'Sora',sans-serif; font-size:22px; font-weight:700; margin-bottom:6px; }
+    .login-card p { color:var(--muted); font-size:14px; margin-bottom:28px; }
+    .pin-input { width:100%; padding:16px; font-size:24px; letter-spacing:8px; text-align:center; border:2px solid var(--border); border-radius:var(--radius-full); outline:none; font-family:'Sora',sans-serif; transition:border-color .2s; }
+    .pin-input:focus { border-color:var(--bloom); box-shadow:0 0 0 3px rgba(178,32,37,.10); }
+    .btn-primary { width:100%; padding:16px; background:var(--bloom); color:#fff; border:none; border-radius:var(--radius-full); font-family:'Sora',sans-serif; font-size:15px; font-weight:600; cursor:pointer; margin-top:14px; box-shadow:0 4px 16px rgba(178,32,37,.25); transition:background .2s; }
+    .btn-primary:hover { background:var(--bloom-dark); }
+    .error-msg { color:var(--error); font-size:13px; margin-top:12px; display:none; font-weight:500; }
+
+    /* ── Top bar ── */
+    #main-app { display:none; }
+    .top-bar { background:var(--surface); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); position:sticky; top:0; z-index:100; }
+    .top-bar-left { display:flex; align-items:center; gap:10px; }
+    .top-bar-logo img { width:36px; height:36px; object-fit:contain; border-radius:8px; }
+    .top-bar-user { font-family:'Sora',sans-serif; font-size:14px; font-weight:600; }
+    .top-bar-sub { font-size:11px; color:var(--bloom); font-weight:600; margin-top:1px; }
+    .btn-logout { padding:8px 16px; background:transparent; border:1.5px solid var(--border); border-radius:var(--radius-full); font-size:13px; color:var(--muted); cursor:pointer; transition:border-color .2s,color .2s; }
+    .btn-logout:hover { border-color:var(--error); color:var(--error); }
+
+    /* ── Tabs ── */
+    .tabs { display:flex; gap:0; padding:16px 16px 0; max-width:860px; margin:0 auto; overflow-x:auto; }
+    .tab-btn { flex:1; min-width:80px; padding:11px 8px; border:none; border-radius:var(--radius) var(--radius) 0 0; background:var(--surface); color:var(--muted); font-family:'Sora',sans-serif; font-size:12px; font-weight:600; cursor:pointer; opacity:.6; white-space:nowrap; }
+    .tab-btn.active { opacity:1; color:var(--bloom); border-bottom:2px solid var(--bloom); }
+
+    /* ── Container / Card ── */
+    .container { max-width:860px; margin:0 auto; padding:0 16px 16px; }
+    .card { background:var(--surface); border-radius:0 0 var(--radius-lg) var(--radius-lg); box-shadow:var(--shadow); padding:20px; }
+
+    /* ── Shared ── */
+    .tab-panel { display:none; } .tab-panel.active { display:block; }
+    .empty-state { text-align:center; padding:40px 16px; color:var(--muted); font-size:14px; }
+    .loader-overlay { position:fixed; inset:0; background:rgba(255,255,255,.88); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+    .loader-overlay.show { display:flex; }
+    .spinner { width:44px; height:44px; border:3px solid var(--border); border-top-color:var(--bloom); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .loader-text { margin-top:14px; font-family:'Sora',sans-serif; font-size:14px; font-weight:600; color:var(--muted); }
+    .toast-wrap { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; width:90%; max-width:400px; }
+    .toast { padding:13px 20px; border-radius:var(--radius-full); font-family:'Sora',sans-serif; font-size:13px; font-weight:600; color:#fff; text-align:center; animation:tIn .25s ease, tOut .3s ease 2.7s forwards; }
+    .toast.success{background:var(--success)} .toast.error{background:var(--error)} .toast.info{background:var(--info)} .toast.warning{background:var(--warning)}
+    @keyframes tIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    @keyframes tOut{to{opacity:0;transform:translateY(10px)}}
+
+    /* ── Field ── */
+    .field { margin-bottom:14px; }
+    .field label, .field-label { display:block; font-size:11px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.5px; }
+    .field select, .field input[type="text"], .field input[type="number"] {
+      width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:var(--radius);
+      font-size:14px; font-family:'DM Sans',sans-serif; color:var(--text); background:var(--surface);
+      outline:none; appearance:none; transition:border-color .2s;
+    }
+    .field select:focus, .field input:focus { border-color:var(--bloom); box-shadow:0 0 0 3px rgba(178,32,37,.08); }
+
+    /* ── Buttons ── */
+    .btn-blue { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; background:var(--info); color:#fff; border:none; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-blue:hover { background:#1d4ed8; }
+    .btn-green { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; background:var(--success); color:#fff; border:none; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-green:hover { background:#15803d; }
+    .btn-green:disabled { opacity:.45; cursor:not-allowed; }
+    .btn-red { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:#fee2e2; color:var(--error); border:1.5px solid #fca5a5; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-red:hover { background:#fecaca; }
+    .btn-ghost { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:var(--bg); color:var(--muted); border:1.5px solid var(--border); border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-ghost:hover { background:#e5e7eb; }
+    .btn-bloom { display:inline-flex; align-items:center; gap:6px; padding:10px 18px; background:var(--bloom); color:#fff; border:none; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-bloom:hover { background:var(--bloom-dark); }
+    .btn-bloom:disabled { opacity:.45; cursor:not-allowed; }
+
+    /* ── Section header ── */
+    .section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+    .section-title { font-family:'Sora',sans-serif; font-size:15px; font-weight:700; }
+    .section-count { background:var(--bloom-light); color:var(--bloom); font-size:12px; font-weight:700; padding:2px 10px; border-radius:var(--radius-full); }
+
+    /* ── Filter bar ── */
+    .filter-bar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; align-items:center; }
+    .filter-bar input, .filter-bar select { padding:9px 12px; border:1.5px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:'DM Sans',sans-serif; outline:none; background:var(--surface); transition:border-color .2s; }
+    .filter-bar input:focus, .filter-bar select:focus { border-color:var(--bloom); }
+
+    /* ── Batch cards (Pending Audit) ── */
+    .batch-list { display:flex; flex-direction:column; gap:10px; }
+    .batch-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-lg); padding:16px 18px; transition:border-color .2s; }
+    .batch-card:hover { border-color:#c7d2fe; }
+    .batch-card.audited-card { border-left:4px solid var(--success); opacity:.7; }
+    .batch-card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+    .batch-code { font-family:monospace; font-size:14px; font-weight:700; color:var(--bloom); }
+    .batch-meta { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.8; }
+    .batch-pills { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+    .pill { display:inline-flex; padding:3px 10px; border-radius:var(--radius-full); font-size:11px; font-weight:700; }
+    .pill-blue { background:#e0e7ff; color:#3730a3; }
+    .pill-green { background:#d1fae5; color:#065f46; }
+    .pill-orange { background:#fef3c7; color:#92400e; }
+    .pill-gray { background:#f3f4f6; color:#4b5563; }
+    .pill-purple { background:#ede9fe; color:#5b21b6; }
+    .pill-red { background:#fee2e2; color:#991b1b; }
+    .batch-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+
+    /* ── Audit Panel (inline) ── */
+    .audit-panel { margin-top:14px; padding-top:14px; border-top:1.5px solid var(--border); display:none; }
+    .audit-panel.open { display:block; animation:fadeIn .15s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+    .audit-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .fee-display { background:var(--bloom-light); border:2px solid var(--bloom); border-radius:var(--radius); padding:14px; text-align:center; margin-bottom:12px; }
+    .fee-amount { font-family:'Sora',sans-serif; font-size:32px; font-weight:700; color:var(--bloom); }
+    .fee-label { font-size:12px; color:var(--muted); margin-top:2px; }
+    .fee-display.no-fee { background:#f9fafb; border-color:var(--border); }
+    .fee-display.no-fee .fee-amount { color:var(--muted); font-size:18px; }
+    .orders-preview { max-height:160px; overflow-y:auto; background:var(--bg); border-radius:var(--radius); padding:10px; margin-bottom:12px; font-family:monospace; font-size:12px; color:var(--muted); line-height:2; }
+
+    /* ── All Batches table-style ── */
+    .batch-row { display:grid; grid-template-columns:1fr 1fr auto auto auto; gap:10px; align-items:center; padding:11px 14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:6px; }
+    .batch-row:hover { border-color:#c7d2fe; }
+    .batch-row-code { font-family:monospace; font-size:13px; font-weight:700; color:var(--bloom); }
+    .batch-row-meta { font-size:12px; color:var(--muted); }
+
+    /* ── Orders browse ── */
+    .order-row { padding:12px 14px; background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--bloom); border-radius:var(--radius); margin-bottom:7px; }
+    .order-row-top { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; }
+    .order-row-id { font-family:monospace; font-size:14px; font-weight:700; }
+    .order-row-meta { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.8; }
+
+    /* ── Status badges ── */
+    .s-handed   { background:#dbeafe; color:#1e40af; }
+    .s-delivered{ background:#d1fae5; color:#065f46; }
+    .s-audited  { background:#ede9fe; color:#5b21b6; }
+    .s-returned { background:#fee2e2; color:#991b1b; }
+    .s-dispatched { background:#fef3c7; color:#92400e; }
+    .s-audit_complete { background:#ede9fe; color:#5b21b6; }
+
+    /* ── Config sections ── */
+    .config-section { background:var(--bg); border-radius:var(--radius-lg); padding:18px; margin-bottom:18px; }
+    .config-section-title { font-family:'Sora',sans-serif; font-size:14px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .zone-item, .agent-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:7px; }
+    .zone-item-info, .agent-item-info { display:flex; flex-direction:column; gap:2px; }
+    .zone-item-label, .agent-item-name { font-size:14px; font-weight:600; }
+    .zone-item-order, .agent-item-meta { font-size:11px; color:var(--muted); }
+    .zone-item-actions, .agent-item-actions { display:flex; gap:6px; }
+    .matrix-info { background:var(--surface); border-radius:var(--radius); padding:14px; margin-bottom:12px; border:1px solid var(--border); font-size:13px; }
+    .matrix-info b { font-weight:700; }
+    .add-form { background:var(--surface); border-radius:var(--radius); border:1.5px dashed var(--border); padding:14px; margin-top:10px; display:none; }
+    .add-form.open { display:block; animation:fadeIn .15s ease; }
+    .add-form-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+    .add-form-row .field { flex:1; min-width:120px; margin-bottom:0; }
+
+    /* ── Summary bar ── */
+    .summary-bar { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .summary-chip { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:10px 16px; font-size:13px; font-weight:600; }
+    .summary-chip span { color:var(--bloom); font-size:18px; font-family:'Sora',sans-serif; display:block; }
+
+    /* ── Divider ── */
+    .divider { display:flex; align-items:center; gap:10px; margin:14px 0; }
+    .divider span { font-size:11px; color:var(--muted); white-space:nowrap; font-weight:500; }
+    .divider::before, .divider::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    @media (max-width:600px) {
+      .audit-grid { grid-template-columns:1fr; }
+      .batch-card-top { flex-direction:column; }
+      .filter-bar { flex-direction:column; align-items:stretch; }
+      .add-form-row { flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="loader-overlay" id="loader"><div class="spinner"></div><div class="loader-text" id="loader-text">Loading...</div></div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- ── Login ──────────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo-wrap">
+      <img src="https://bloompharmacy.github.io/bloom-delivery/B-big-logo.png" alt="Bloom" class="login-logo-img">
+    </div>
+    <div class="login-badge">🛡️ Admin Panel</div>
+    <h1>Bloom Online — Admin</h1>
+    <p>Enter your admin passcode to continue</p>
+    <input type="password" class="pin-input" id="passcode-input"
+           inputmode="numeric" maxlength="10" placeholder="••••"
+           autocomplete="one-time-code" data-form-type="other" name="passcode-otp">
+    <button class="btn-primary" id="unlock-btn">Unlock</button>
+    <div class="error-msg" id="login-error">Invalid passcode. Please try again.</div>
+  </div>
+</div>
+
+<!-- ── Main App ───────────────────────────────────────────────────────────── -->
+<div id="main-app">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="top-bar-logo"><img src="https://bloompharmacy.github.io/bloom-delivery/B-big-logo.png" alt="Bloom"></div>
+      <div>
+        <div class="top-bar-user" id="display-user"></div>
+        <div class="top-bar-sub">Online Admin</div>
+      </div>
+    </div>
+    <button class="btn-logout" id="logout-btn">Logout</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-audit-btn">📋 Pending Audit</button>
+    <button class="tab-btn" id="tab-batches-btn">📦 All Batches</button>
+    <button class="tab-btn" id="tab-orders-btn">🔍 Orders</button>
+    <button class="tab-btn" id="tab-config-btn">⚙️ Settings</button>
+  </div>
+
+  <div class="container">
+    <div class="card">
+
+      <!-- ── Pending Audit ─────────────────────────────────────────────── -->
+      <div class="tab-panel active" id="tab-audit">
+        <div class="section-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="section-title">Batches Awaiting Audit</div>
+            <span class="section-count" id="audit-count">0</span>
+          </div>
+          <button class="btn-ghost" id="btn-refresh-audit">↻ Refresh</button>
+        </div>
+        <div class="summary-bar" id="audit-summary-bar" style="display:none"></div>
+        <div id="audit-list"><div class="empty-state">Loading…</div></div>
+      </div>
+
+      <!-- ── All Batches ───────────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-batches">
+        <div class="filter-bar">
+          <input type="date" id="b-from" style="min-width:130px">
+          <input type="date" id="b-to" style="min-width:130px">
+          <select id="b-status" style="min-width:150px">
+            <option value="">All statuses</option>
+            <option value="dispatched">Dispatched</option>
+            <option value="audit_complete">Audit Complete</option>
+          </select>
+          <button class="btn-blue" id="btn-search-batches">Search</button>
+          <button class="btn-ghost" id="btn-reset-batches">Reset</button>
+        </div>
+        <div id="batches-list"><div class="empty-state">Use filters above to load batches</div></div>
+      </div>
+
+      <!-- ── Orders Browse ─────────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-orders">
+        <div class="filter-bar">
+          <input type="date" id="o-from" style="min-width:130px">
+          <input type="date" id="o-to" style="min-width:130px">
+          <select id="o-status" style="min-width:150px">
+            <option value="">All statuses</option>
+            <option value="handed">Handed Over</option>
+            <option value="delivered">Delivered</option>
+            <option value="returned">Returned</option>
+            <option value="audited">Audited</option>
+          </select>
+          <input type="text" id="o-search" placeholder="Order ID…" style="min-width:120px">
+          <button class="btn-blue" id="btn-search-orders">Search</button>
+          <button class="btn-ghost" id="btn-reset-orders">Reset</button>
+        </div>
+        <div id="orders-list"><div class="empty-state">Use filters above to load orders</div></div>
+      </div>
+
+      <!-- ── Settings ──────────────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-config">
+
+        <!-- Operational Zones -->
+        <div class="config-section">
+          <div class="config-section-title">🗺️ Operational Zones
+            <button class="btn-blue" id="btn-toggle-add-zone" style="margin-left:auto;padding:6px 14px;font-size:12px">＋ Add Zone</button>
+          </div>
+          <div class="add-form" id="add-zone-form">
+            <div class="add-form-row">
+              <div class="field"><label>Zone Label</label><input type="text" id="new-zone-label" placeholder="e.g., East Cairo"></div>
+              <div class="field" style="max-width:100px"><label>Order</label><input type="number" id="new-zone-order" placeholder="0" min="0"></div>
+              <button class="btn-green" id="btn-save-zone" style="margin-bottom:0">Save</button>
+              <button class="btn-ghost" id="btn-cancel-zone" style="margin-bottom:0">Cancel</button>
+            </div>
+          </div>
+          <div id="zones-list"><div class="empty-state" style="padding:16px">No zones configured</div></div>
+        </div>
+
+        <!-- Delivery Agents -->
+        <div class="config-section">
+          <div class="config-section-title">🚴 Delivery Agents
+            <button class="btn-blue" id="btn-toggle-add-agent" style="margin-left:auto;padding:6px 14px;font-size:12px">＋ Add Agent</button>
+          </div>
+          <div class="add-form" id="add-agent-form">
+            <div class="add-form-row">
+              <div class="field"><label>Agent Name</label><input type="text" id="new-agent-name" placeholder="e.g., Ahmed"></div>
+              <div class="field"><label>Agent ID (slug)</label><input type="text" id="new-agent-id" placeholder="e.g., ahmed_01"></div>
+              <button class="btn-green" id="btn-save-agent" style="margin-bottom:0">Save</button>
+              <button class="btn-ghost" id="btn-cancel-agent" style="margin-bottom:0">Cancel</button>
+            </div>
+          </div>
+          <div id="agents-list"><div class="empty-state" style="padding:16px">No agents configured</div></div>
+        </div>
+
+        <!-- Shipping Matrix -->
+        <div class="config-section">
+          <div class="config-section-title">💰 Shipping Fee Matrix</div>
+          <div class="matrix-info" id="matrix-info">
+            <b>Status:</b> Checking…
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+            The matrix contains 47 × 47 = 2,209 shipping-fee cells (EGP). Seeding overwrites the existing matrix. Only run this once, or when the fee table changes.
+          </p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn-bloom" id="btn-seed-matrix">🌱 Seed / Reset Matrix</button>
+            <button class="btn-ghost" id="btn-check-matrix">↻ Check Status</button>
+          </div>
+        </div>
+
+      </div><!-- /tab-config -->
+
+    </div><!-- /card -->
+  </div><!-- /container -->
+</div><!-- /main-app -->
+
+<script type="module">
+console.log('[Bloom OL Admin] Build: 2026-05-19 — v1.0.0');
+
+import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
+         deleteDoc, collection, query, where, orderBy, limit, writeBatch,
+         serverTimestamp, Timestamp, enableIndexedDbPersistence, onSnapshot }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAnalytics }              from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
+
+// ── Firebase — dedicated Bloom Online Delivery project ────────────────────────
+const app = initializeApp({
+  apiKey:            "AIzaSyBnotQTRCsolWRY8OkQUjb68RV6N-alZg4",
+  authDomain:        "bloom-online-delivery.firebaseapp.com",
+  projectId:         "bloom-online-delivery",
+  storageBucket:     "bloom-online-delivery.firebasestorage.app",
+  messagingSenderId: "1083336380275",
+  appId:             "1:1083336380275:web:a8e80a8e4de6e6a40ebf06",
+  measurementId:     "G-VPT8W9WNHF"
+});
+const db        = getFirestore(app);
+const auth      = getAuth(app);
+const analytics = getAnalytics(app);
+
+try { await enableIndexedDbPersistence(db); } catch(e) {}
+await signInAnonymously(auth);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const OL_STORE_ID    = 'online';
+const ADMIN_ROLES    = ['super_admin', 'store_admin'];
+
+// ── 47-region registry (source: Shippingfees.xlsx) ───────────────────────────
+const REGIONS = [
+  { id:'mohandseen',         label:'Mohandseen'                      },
+  { id:'dokki',              label:'Dokki'                           },
+  { id:'zamalek',            label:'Zamalek'                         },
+  { id:'bulaq_daqrur',       label:'Bulaq Daqrur'                    },
+  { id:'giza',               label:'Giza'                            },
+  { id:'imbaba',             label:'Imbaba'                          },
+  { id:'garden_city',        label:'Garden City'                     },
+  { id:'hadayek_el_kobba',   label:'Hadayek el Kobba'                },
+  { id:'al_haram',           label:'Al Haram'                        },
+  { id:'shobra_al_khayma',   label:'Shobra al Khayma'                },
+  { id:'el_zaytoun',         label:'El Zaytoun'                      },
+  { id:'maadi',              label:'Maadi'                           },
+  { id:'heliopolis',         label:'Heliopolis'                      },
+  { id:'mokattam',           label:'Mokattam'                        },
+  { id:'nasr_city',          label:'Nasr City'                       },
+  { id:'ain_shams',          label:'Ain Shams'                       },
+  { id:'al_marj',            label:'Al Marj'                         },
+  { id:'al_hadaba_el_wosta', label:'Al Hadaba el Wosta'              },
+  { id:'al_harfyeen',        label:'Al Harfyeen'                     },
+  { id:'sheikh_zayed',       label:'Sheikh Zayed'                    },
+  { id:'el_salam_city',      label:'El Salam City'                   },
+  { id:'helwan',             label:'Helwan'                          },
+  { id:'al_rehab',           label:'Al Rehab / 1st Settlement'       },
+  { id:'new_cairo_3rd_5th',  label:'New Cairo (3rd & 5th Settlement)'},
+  { id:'sixth_october',      label:'6th of October'                  },
+  { id:'el_obour_city',      label:'El Obour City'                   },
+  { id:'madinaty',           label:'Madinaty'                        },
+  { id:'el_shorouk',         label:'El Shorouk'                      },
+  { id:'badr',               label:'Badr City'                       },
+  { id:'tenth_ramadan',      label:'10th of Ramadan'                 },
+  { id:'capital_city',       label:'Capital City'                    },
+  { id:'al_mansouria',       label:'Al Mansouria'                    },
+  { id:'misr_el_qadima',     label:'Misr El Qadima'                  },
+  { id:'shobra',             label:'Shobra'                          },
+  { id:'sheraton_almaza',    label:'Sheraton / Almaza'               },
+  { id:'airport',            label:'Airport'                         },
+  { id:'manyal',             label:'Manyal'                          },
+  { id:'al_matariyyah',      label:'Al Matariyyah'                   },
+  { id:'new_cairo_auc',      label:'New Cairo (AUC / Mivida)'        },
+  { id:'beverly_hills',      label:'Beverly Hills'                   },
+  { id:'pyramids_gardens',   label:'Pyramids Gardens'                },
+  { id:'october_gardens',    label:'October Gardens'                 },
+  { id:'new_giza',           label:'New Giza'                        },
+  { id:'mv_icity',           label:'New Cairo (Mountain View / iCity)'},
+  { id:'zahraa_el_maadi',    label:'Zahraa el Maadi'                 },
+  { id:'carfour_el_maadi',   label:'Carrefour El Maadi'              },
+  { id:'zahraa_nasr_city',   label:'Zahraa Nasr City'                },
+];
+
+// Full 47×47 fee matrix (EGP) — row/col order matches REGIONS above
+const RAW_MATRIX = [
+  [ 12,  33,  33,  50,  55,  55,  55,  77,  99, 105, 110, 116, 176, 138, 193, 193, 160, 176, 176, 242, 259, 259, 286, 314, 314, 330, 341, 369, 424, 506, 506, 215,  66,  72, 149, 226,  61, 132, 314, 209, 143, 242, 149, 303, 154, 143, 165],
+  [ 33,  12,  44,  44,  66,  66,  44,  77,  83,  83,  99, 105, 132,  99, 154, 149, 176, 138, 187, 193, 198, 215, 253, 281, 281, 297, 308, 336, 391, 473, 473, 209,  66,  72, 143, 176,  50, 116, 281, 226, 116, 231, 171, 297, 154, 138, 160],
+  [ 33,  44,  12,  50,  66,  50,  39,  72, 105,  77,  99,  99, 121,  94, 143, 143, 154, 138, 226, 193, 209, 198, 253, 281, 281, 297, 308, 336, 391, 473, 473, 176,  61,  50, 132, 165,  55, 116, 264, 220, 154, 253, 165, 286, 143, 138, 154],
+  [ 50,  44,  50,  12,  72,  55,  61,  94,  99,  83, 110, 105, 127, 110, 182, 160, 182, 143, 209, 198, 215, 220, 253, 281, 281, 297, 308, 336, 391, 473, 473, 171,  66,  77, 165, 198,  66, 132, 297, 237, 116, 220, 154, 308, 154, 149, 171],
+  [ 55,  66,  66,  72,  12,  83,  61,  99,  94,  99, 121,  66, 143,  88, 171, 171, 193, 110, 198, 231, 226, 171, 253, 253, 281, 308, 336, 363, 418, 473, 473, 215,  83, 105, 154, 187,  44, 143, 292, 259, 138, 198, 182, 303, 121, 116, 165],
+  [ 55,  66,  50,  55,  83,  12,  72,  83, 121,  77, 105, 127, 143, 116, 149, 127, 138, 160, 160, 193, 198, 231, 242, 281, 281, 286, 308, 363, 446, 418, 501, 138,  83,  55, 154, 187,  77, 132, 281, 215, 143, 248, 154, 319, 171, 165, 198],
+  [ 55,  44,  39,  61,  61,  72,  12,  61,  99,  72,  88,  88, 116,  83, 116, 138, 165, 121, 176, 209, 204, 209, 209, 237, 286, 264, 292, 325, 369, 418, 473, 198,  44,  50, 121, 154,  44, 105, 264, 237, 165, 253, 182, 281, 138, 127, 143],
+  [ 77,  77,  72,  94,  99,  83,  61,  25, 132,  72,  50, 121,  72,  88, 110, 105,  94, 138, 143, 237, 165, 226, 198, 220, 319, 242, 275, 308, 347, 391, 418, 198,  55,  55,  94, 127,  83,  66, 231, 270, 198, 303, 209, 242, 160, 143, 121],
+  [ 99,  83, 105,  99,  94, 121,  99, 132,  25, 165, 209, 138, 215, 165, 220, 231, 231, 176, 270, 165, 270, 253, 297, 330, 226, 374, 374, 374, 501, 556, 556, 143, 143, 143, 193, 226,  83, 209, 363, 237,  83, 171, 138, 325, 143, 143, 198],
+  [105,  83,  77,  83,  99,  77,  72,  72, 165,  25,  66, 187,  94, 143, 121,  99,  99, 182, 138, 253, 171, 264, 209, 220, 363, 253, 297, 319, 363, 418, 501, 171,  94,  61, 121, 154,  88,  94, 275, 253, 198, 297, 209, 286, 176, 171, 165],
+  [110,  99,  99, 110, 121, 105,  88,  50, 209,  66,  25, 165,  61, 116,  88,  61,  66, 160,  99, 264, 132, 264, 198, 231, 352, 198, 253, 275, 336, 363, 418, 204,  94,  77,  66,  99, 116,  39, 226, 286, 198, 330, 237, 231, 182, 165, 121],
+  [116, 105,  99, 105,  66, 127,  88, 121, 138, 187, 165,  25, 171, 105, 176, 209, 226,  94, 231, 275, 253, 143, 253, 231, 308, 336, 336, 363, 418, 501, 446, 248,  99, 132, 182, 253,  72, 193, 253, 297, 165, 226, 209, 319,  66,  88, 182],
+  [176, 132, 121, 127, 143, 143, 116,  72, 215,  94,  61, 171,  25, 105,  72,  77,  77, 143,  99, 270, 132, 248, 165, 220, 358, 220, 242, 259, 336, 391, 446, 209,  72,  77,  61,  99, 110,  55, 226, 303, 215, 292, 226, 220, 154, 143, 121],
+  [138,  99,  94, 110,  88, 116,  83,  88, 165, 143, 116, 105, 105,  25, 110, 160, 209,  66, 182, 281, 204, 204, 220, 204, 336, 281, 308, 336, 391, 446, 429, 264, 105, 121, 154, 187, 105, 165, 281, 325, 226, 286, 253, 281, 138, 116, 132],
+  [193, 154, 143, 182, 171, 149, 116, 110, 220, 121,  88, 176,  72, 110,  25, 105, 127, 138, 127, 270, 171, 275, 154, 176, 418, 231, 226, 253, 330, 402, 402, 253, 110, 110,  88, 105, 143, 105, 198, 319, 264, 303, 264, 215, 143, 116,  66],
+  [193, 149, 143, 160, 171, 127, 138, 105, 231,  99,  61, 209,  77, 160, 105,  25,  50, 171,  88, 286, 116, 275, 198, 248, 391, 198, 281, 264, 363, 374, 473, 286,  99,  99,  72, 105, 127,  33, 253, 308, 292, 336, 248, 253, 193, 182, 143],
+  [160, 176, 154, 182, 193, 138, 165,  94, 231,  99,  66, 226,  77, 209, 127,  50,  25, 198,  88, 325, 105, 308, 226, 281, 407, 198, 275, 264, 363, 374, 473, 242, 121, 110,  99, 132, 143,  44, 281, 314, 275, 363, 286, 264, 215, 253, 193],
+  [176, 138, 138, 143, 110, 160, 121, 138, 176, 182, 160,  94, 143,  66, 138, 171, 198,  25, 187, 297, 215, 198, 209, 198, 336, 281, 292, 308, 391, 446, 418, 330,  99, 138, 138, 154,  94, 143, 226, 325, 198, 253, 237, 270, 105,  44, 116],
+  [176, 187, 226, 209, 198, 160, 176, 143, 270, 138,  99, 231,  99, 182, 127,  88,  88, 187,  25, 352,  66, 325, 198, 242, 446, 171, 253, 226, 347, 341, 446, 259, 149, 138,  77, 116, 182,  83, 253, 358, 292, 352, 308, 231, 220, 198, 143],
+  [242, 193, 193, 198, 231, 193, 209, 237, 165, 253, 264, 275, 270, 281, 270, 286, 325, 297, 352,  25, 374, 352, 391, 418, 182, 473, 473, 501, 567, 638, 693, 226, 226, 237, 292, 336, 237, 292, 446,  61, 182, 182, 110, 446, 303, 275, 380],
+  [259, 198, 209, 215, 226, 198, 204, 165, 270, 171, 132, 253, 132, 204, 171, 116, 105, 215,  66, 374,  25, 385, 193, 242, 440, 171, 248, 226, 308, 336, 446, 275, 165, 149,  99, 138, 198,  99, 253, 358, 281, 407, 292, 215, 248, 253, 154],
+  [259, 215, 198, 220, 171, 231, 209, 226, 253, 264, 264, 143, 248, 204, 275, 275, 308, 198, 325, 352, 385,  25, 292, 264, 429, 418, 391, 429, 473, 550, 446, 363, 209, 237, 264, 308, 209, 292, 336, 385, 253, 308, 286, 363, 149, 138, 275],
+  [286, 253, 253, 253, 253, 242, 209, 198, 297, 209, 198, 253, 165, 220, 154, 198, 226, 209, 198, 391, 193, 292,  25, 143, 484, 198, 193, 209, 253, 347, 308, 336, 193, 209, 127, 160, 237, 154, 132, 391, 336, 391, 369, 171, 198, 182,  99],
+  [314, 281, 281, 281, 253, 281, 237, 220, 330, 220, 231, 231, 220, 204, 176, 248, 281, 198, 242, 418, 242, 264, 143,  25, 484, 253, 226, 226, 281, 473, 308, 418, 171, 182, 154, 198, 182, 171, 143, 440, 314, 369, 358, 176, 171, 149, 149],
+  [314, 281, 281, 281, 281, 281, 286, 319, 226, 363, 352, 308, 358, 336, 418, 391, 407, 336, 446, 182, 440, 429, 484, 484,  25, 528, 539, 556, 693, 693, 748, 281, 292, 292, 374, 418, 292, 374, 501, 198, 182, 121, 165, 616, 385, 319, 418],
+  [330, 297, 297, 297, 308, 286, 264, 242, 374, 253, 198, 336, 220, 281, 231, 198, 198, 281, 171, 473, 171, 418, 198, 253, 528,  25, 226, 209, 308, 308, 446, 374, 237, 237, 182, 215, 275, 209, 308, 440, 391, 462, 413, 237, 286, 292, 193],
+  [341, 308, 308, 308, 336, 308, 292, 275, 374, 297, 253, 336, 242, 308, 226, 281, 275, 292, 253, 473, 248, 391, 193, 226, 539, 226,  25, 116, 187, 281, 281, 407, 292, 308, 209, 253, 308, 253, 226, 473, 413, 468, 413, 110, 292, 292, 193],
+  [369, 336, 336, 336, 363, 363, 325, 308, 374, 319, 275, 363, 259, 336, 253, 264, 264, 308, 226, 501, 226, 429, 209, 226, 556, 209, 116,  25, 132, 226, 308, 429, 319, 319, 237, 281, 347, 264, 270, 495, 440, 495, 440, 127, 308, 303, 215],
+  [424, 391, 391, 391, 418, 446, 369, 347, 501, 363, 336, 418, 336, 391, 330, 363, 363, 391, 347, 567, 308, 473, 253, 281, 693, 308, 187, 132,  25, 215, 204, 517, 347, 363, 292, 308, 418, 319, 308, 550, 495, 550, 495, 187, 363, 369, 275],
+  [506, 473, 473, 473, 473, 418, 418, 391, 556, 418, 363, 501, 391, 446, 402, 374, 374, 446, 341, 638, 336, 550, 347, 473, 693, 308, 281, 226, 215,  25, 391, 556, 374, 402, 319, 391, 457, 319, 336, 660, 550, 660, 550, 275, 396, 468, 358],
+  [506, 473, 473, 473, 473, 501, 473, 418, 556, 501, 418, 446, 446, 429, 402, 473, 473, 418, 446, 693, 446, 446, 308, 308, 748, 446, 281, 308, 204, 391,  25, 600, 374, 402, 347, 363, 457, 374, 226, 770, 660, 715, 660, 275, 440, 385, 385],
+  [215, 209, 176, 171, 215, 138, 198, 198, 143, 171, 204, 248, 209, 264, 253, 286, 242, 330, 259, 226, 275, 363, 336, 418, 281, 374, 407, 429, 517, 556, 600,  25, 292, 292, 292, 336, 292, 308, 556, 198, 171, 264, 171, 440, 330, 270, 319],
+  [ 66,  66,  61,  66,  83,  83,  44,  55, 143,  94,  94,  99,  72, 105, 110,  99, 121,  99, 149, 226, 165, 209, 193, 171, 292, 237, 292, 319, 347, 374, 374, 292,  25,  50, 105, 143,  61, 105, 253, 275, 154, 209, 198, 292, 116,  88, 154],
+  [ 72,  72,  50,  77, 105,  55,  50,  55, 143,  61,  77, 132,  77, 121, 110,  99, 110, 138, 138, 237, 149, 237, 209, 182, 292, 237, 308, 319, 363, 402, 402, 292,  50,  25, 110, 143,  66,  88, 264, 253, 182, 303, 193, 275, 176, 138, 165],
+  [149, 143, 132, 165, 154, 154, 121,  94, 193, 121,  66, 182,  61, 154,  88,  72,  99, 138,  77, 292,  99, 264, 127, 154, 374, 182, 209, 237, 292, 319, 347, 292, 105, 110,  25,  77, 138,  77, 237, 325, 275, 319, 264, 209, 187, 171,  94],
+  [226, 176, 165, 198, 187, 187, 154, 127, 226, 154,  99, 253,  99, 187, 105, 105, 132, 154, 116, 336, 138, 308, 160, 198, 418, 215, 253, 281, 308, 391, 363, 336, 143, 143,  77,  25, 171, 110, 242, 385, 330, 358, 303, 248, 220, 220, 127],
+  [ 61,  50,  55,  66,  44,  77,  44,  83,  83,  88, 116,  72, 110, 105, 143, 127, 143,  94, 182, 237, 198, 209, 237, 182, 292, 275, 308, 347, 418, 457, 457, 292,  61,  66, 138, 171,  25, 127, 281, 259, 116, 242, 182, 303, 127, 110, 165],
+  [132, 116, 116, 132, 143, 132, 105,  66, 209,  94,  39, 193,  55, 165, 105,  33,  44, 143,  83, 292,  99, 292, 154, 171, 374, 209, 253, 264, 319, 319, 374, 308, 105,  88,  77, 110, 127,  25, 253, 286, 237, 330, 248, 248, 193, 176, 132],
+  [314, 281, 264, 297, 292, 281, 264, 231, 363, 275, 226, 253, 226, 281, 198, 253, 281, 226, 253, 446, 253, 336, 132, 143, 501, 308, 226, 270, 308, 336, 226, 556, 253, 264, 237, 242, 281, 253,  25, 495, 341, 396, 435, 160, 193, 182, 154],
+  [209, 226, 220, 237, 259, 215, 237, 270, 237, 253, 286, 297, 303, 325, 319, 308, 314, 325, 358,  61, 358, 385, 391, 440, 198, 440, 473, 495, 550, 660, 770, 198, 275, 253, 325, 385, 259, 286, 495,  25, 187, 198, 138, 457, 308, 286, 319],
+  [143, 116, 154, 116, 138, 143, 165, 198,  83, 198, 198, 165, 215, 226, 264, 292, 275, 198, 292, 182, 281, 253, 336, 314, 182, 391, 413, 440, 495, 550, 660, 171, 154, 182, 275, 330, 116, 237, 341, 187,  25, 121, 121, 402, 198, 187, 286],
+  [242, 231, 253, 220, 198, 248, 253, 303, 171, 297, 330, 226, 292, 286, 303, 336, 363, 253, 352, 182, 407, 308, 391, 369, 121, 462, 468, 495, 550, 660, 715, 264, 209, 303, 319, 358, 242, 330, 396, 198, 121,  25, 182, 583, 363, 237, 336],
+  [149, 171, 165, 154, 182, 154, 182, 209, 138, 209, 237, 209, 226, 253, 264, 248, 286, 237, 308, 110, 292, 286, 369, 358, 165, 413, 413, 440, 495, 550, 660, 171, 198, 193, 264, 303, 182, 248, 435, 138, 121, 182,  25, 418, 220, 209, 275],
+  [303, 297, 286, 308, 303, 319, 281, 242, 325, 286, 231, 319, 220, 281, 215, 253, 264, 270, 231, 446, 215, 363, 171, 176, 616, 237, 110, 127, 187, 275, 275, 440, 292, 275, 209, 248, 303, 248, 160, 457, 402, 583, 418,  25, 275, 253, 231],
+  [154, 154, 143, 154, 121, 171, 138, 160, 143, 176, 182,  66, 154, 138, 143, 193, 215, 105, 220, 303, 248, 149, 198, 171, 385, 286, 292, 308, 363, 396, 440, 330, 116, 176, 187, 220, 127, 193, 193, 308, 198, 363, 220, 275,  25,  55, 143],
+  [143, 138, 138, 149, 116, 165, 127, 143, 143, 171, 165,  88, 143, 116, 116, 182, 253,  44, 198, 275, 253, 138, 182, 149, 319, 292, 292, 303, 369, 468, 385, 270,  88, 138, 171, 220, 110, 176, 182, 286, 187, 237, 209, 253,  55,  25, 143],
+  [165, 160, 154, 171, 165, 198, 143, 121, 198, 165, 121, 182, 121, 132,  66, 143, 193, 116, 143, 380, 154, 275,  99, 149, 418, 193, 193, 215, 275, 358, 385, 319, 154, 165,  94, 127, 165, 132, 154, 319, 286, 336, 275, 231, 143, 143,  25],
+];
+
+// Build region ID lookup map (id → index, for fast fee lookup)
+const REGION_IDX = {};
+REGIONS.forEach((r, i) => { REGION_IDX[r.id] = i; });
+
+/** Instant O(1) fee lookup — no Firestore read needed (embedded data) */
+function lookupFee(fromId, toId) {
+  const i = REGION_IDX[fromId], j = REGION_IDX[toId];
+  if (i === undefined || j === undefined) throw new Error(`Unknown region: ${fromId} or ${toId}`);
+  return RAW_MATRIX[i][j];
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let session           = null;
+let _heartbeatUnsub   = null;
+let _forceLogoutProg  = false;
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+document.getElementById('unlock-btn')         .addEventListener('click', handleLogin);
+document.getElementById('passcode-input')     .addEventListener('keydown', e => { if (e.key==='Enter') handleLogin(); });
+document.getElementById('logout-btn')         .addEventListener('click', handleLogout);
+document.getElementById('btn-refresh-audit')  .addEventListener('click', loadPendingAudit);
+document.getElementById('btn-search-batches') .addEventListener('click', loadBatches);
+document.getElementById('btn-reset-batches')  .addEventListener('click', resetBatchFilters);
+document.getElementById('btn-search-orders')  .addEventListener('click', loadOrders);
+document.getElementById('btn-reset-orders')   .addEventListener('click', resetOrderFilters);
+document.getElementById('btn-toggle-add-zone').addEventListener('click', () => toggleAddForm('zone'));
+document.getElementById('btn-cancel-zone')    .addEventListener('click', () => toggleAddForm('zone', false));
+document.getElementById('btn-save-zone')      .addEventListener('click', saveZone);
+document.getElementById('btn-toggle-add-agent').addEventListener('click', () => toggleAddForm('agent'));
+document.getElementById('btn-cancel-agent')   .addEventListener('click', () => toggleAddForm('agent', false));
+document.getElementById('btn-save-agent')     .addEventListener('click', saveAgent);
+document.getElementById('btn-seed-matrix')    .addEventListener('click', seedMatrix);
+document.getElementById('btn-check-matrix')   .addEventListener('click', checkMatrix);
+
+document.getElementById('tab-audit-btn')  .addEventListener('click', function() { switchTab('audit',   this); loadPendingAudit(); });
+document.getElementById('tab-batches-btn').addEventListener('click', function() { switchTab('batches', this); });
+document.getElementById('tab-orders-btn') .addEventListener('click', function() { switchTab('orders',  this); });
+document.getElementById('tab-config-btn') .addEventListener('click', function() { switchTab('config',  this); loadConfig(); });
+
+// Date defaults
+const _today = localDateStr();
+['b-from','b-to','o-from','o-to'].forEach(id => { document.getElementById(id).value = _today; });
+
+// Session restore
+try { const s = localStorage.getItem('bloom_ol_adm'); if (s) { session = JSON.parse(s); bootApp(); } } catch(e) {}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function localDateStr(d) {
+  const dt = d || new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function handleLogin() {
+  const passcode = document.getElementById('passcode-input').value.trim();
+  if (!passcode) return;
+  showLoader('Verifying…');
+  try {
+    const snap = await getDoc(doc(db, 'users', passcode));
+    if (!snap.exists()) { hideLoader(); showError('Invalid passcode.'); return; }
+    const ud = snap.data();
+    if ((ud.status || 'active') !== 'active') { hideLoader(); showError('Account deactivated.'); return; }
+    if (!ADMIN_ROLES.includes(ud.role)) { hideLoader(); showError('Admin access only.'); return; }
+    if (ud.role !== 'super_admin' && ud.store_id !== OL_STORE_ID) {
+      hideLoader(); showError('Online store admin access only.'); return;
+    }
+    session = { passcode, username: ud.username || ud.display_name || passcode, role: ud.role, store_id: ud.store_id };
+    try { localStorage.setItem('bloom_ol_adm', JSON.stringify(session)); } catch(e) {}
+    document.getElementById('login-error').style.display = 'none';
+    hideLoader(); bootApp();
+  } catch(e) { hideLoader(); showToast('Connection error', 'error'); }
+}
+
+function showError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('passcode-input').value = '';
+}
+
+function handleLogout() {
+  stopHeartbeat();
+  try { localStorage.removeItem('bloom_ol_adm'); } catch(e) {}
+  session = null;
+  document.getElementById('main-app').style.display    = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('passcode-input').value = '';
+}
+
+async function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display    = 'block';
+  document.getElementById('display-user').textContent  = session.username;
+  startHeartbeat();
+  loadPendingAudit();
+}
+
+// ── Heartbeat ─────────────────────────────────────────────────────────────────
+function startHeartbeat() {
+  stopHeartbeat();
+  if (!session?.passcode) return;
+  _heartbeatUnsub = onSnapshot(doc(db, 'users', session.passcode), snap => {
+    if (!snap.exists()) forceLogout('missing');
+    else if ((snap.data().status || 'active') !== 'active') forceLogout('inactive');
+  }, err => console.warn('[OL Admin heartbeat]', err?.code));
+}
+function stopHeartbeat() { if (_heartbeatUnsub) { _heartbeatUnsub(); _heartbeatUnsub = null; } }
+function forceLogout(reason) {
+  if (_forceLogoutProg) return; _forceLogoutProg = true; stopHeartbeat();
+  const msg = reason === 'missing' ? 'Your account no longer exists.' : 'Your account has been deactivated.';
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ title:'Access Revoked', text:msg, icon:'error', confirmButtonText:'OK',
+                allowOutsideClick:false, allowEscapeKey:false })
+      .then(() => { handleLogout(); _forceLogoutProg = false; });
+  } else { alert(msg); handleLogout(); _forceLogoutProg = false; }
+}
+
+// ── Tab switch ────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── PENDING AUDIT ────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+async function loadPendingAudit() {
+  showLoader('Loading pending batches…');
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'ol_batches'),
+      where('status', '==', 'dispatched'),
+      where('store_id', '==', OL_STORE_ID),
+      orderBy('dispatched_at', 'desc'),
+      limit(200)
+    ));
+    const batches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    hideLoader();
+    renderPendingAudit(batches);
+  } catch(e) {
+    hideLoader(); showToast('Failed to load — check Firestore index', 'error');
+    console.error('[OL Admin] loadPendingAudit:', e);
+    // Try fallback without orderBy if composite index not built
+    try {
+      showLoader('Trying fallback query…');
+      const snap2 = await getDocs(query(
+        collection(db, 'ol_batches'),
+        where('status', '==', 'dispatched'),
+        where('store_id', '==', OL_STORE_ID),
+        limit(200)
+      ));
+      const batches2 = snap2.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a,b) => (b.dispatched_at?.toMillis?.() || 0) - (a.dispatched_at?.toMillis?.() || 0));
+      hideLoader();
+      renderPendingAudit(batches2);
+    } catch(e2) { hideLoader(); console.error('[OL Admin] fallback also failed:', e2); }
+  }
+}
+
+function renderPendingAudit(batches) {
+  document.getElementById('audit-count').textContent = batches.length;
+  const container = document.getElementById('audit-list');
+  if (!batches.length) {
+    container.innerHTML = '<div class="empty-state">✅ No batches pending audit</div>';
+    document.getElementById('audit-summary-bar').style.display = 'none';
+    return;
+  }
+
+  // Summary bar
+  const totalOrders = batches.reduce((s, b) => s + (b.order_count || 0), 0);
+  document.getElementById('audit-summary-bar').style.display = 'flex';
+  document.getElementById('audit-summary-bar').innerHTML = `
+    <div class="summary-chip"><span>${batches.length}</span> Run Sheets</div>
+    <div class="summary-chip"><span>${totalOrders}</span> Total Orders</div>
+  `;
+
+  // Build region options once
+  const regionOptions = REGIONS.map(r =>
+    `<option value="${r.id}">${r.label}</option>`
+  ).join('');
+
+  container.innerHTML = batches.map(b => {
+    const ts = b.dispatched_at?.toDate?.();
+    const dateLabel = ts
+      ? ts.toLocaleDateString('en-GB', { day:'2-digit', month:'short' })
+        + ' ' + ts.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
+      : b.date || '—';
+
+    return `<div class="batch-card" id="bc-${b.id}">
+      <div class="batch-card-top">
+        <div>
+          <div class="batch-code">${b.batch_code || b.id}</div>
+          <div class="batch-meta">
+            👤 ${b.agent_name || b.agent_id} &nbsp;·&nbsp;
+            🕐 ${dateLabel} &nbsp;·&nbsp;
+            By: ${b.dispatched_by_name || b.dispatched_by || '—'}
+          </div>
+          <div class="batch-pills">
+            <span class="pill pill-blue">${b.op_zone_label || b.op_zone_id || '—'}</span>
+            <span class="pill pill-orange">${b.order_count || 0} orders</span>
+            <span class="pill s-dispatched pill">${b.status}</span>
+          </div>
+        </div>
+        <div class="batch-actions">
+          <button class="btn-bloom" onclick="openAuditPanel('${b.id}')">Audit ›</button>
+        </div>
+      </div>
+
+      <!-- Inline audit panel -->
+      <div class="audit-panel" id="ap-${b.id}">
+        <div class="divider"><span>Shipping Fee Audit — ${b.batch_code || b.id}</span></div>
+
+        <div style="margin-bottom:10px;font-size:13px;color:var(--muted)">
+          Orders in this batch:
+        </div>
+        <div class="orders-preview" id="op-${b.id}">
+          ${(b.order_ids || []).join(' · ') || 'Loading…'}
+        </div>
+
+        <div class="audit-grid">
+          <div class="field">
+            <label>From Region (Store / Pickup)</label>
+            <select id="from-${b.id}" onchange="updateFeeDisplay('${b.id}')">
+              <option value="">— Select origin —</option>
+              ${regionOptions}
+            </select>
+          </div>
+          <div class="field">
+            <label>To Region (Delivery Area)</label>
+            <select id="to-${b.id}" onchange="updateFeeDisplay('${b.id}')">
+              <option value="">— Select destination —</option>
+              ${regionOptions}
+            </select>
+          </div>
+        </div>
+
+        <div class="fee-display no-fee" id="fee-display-${b.id}">
+          <div class="fee-amount">Select regions</div>
+          <div class="fee-label">to calculate shipping fee</div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-green" id="btn-confirm-${b.id}"
+                  onclick="confirmAudit('${b.id}', '${b.agent_id}', '${b.agent_name}', '${b.op_zone_id}', '${b.op_zone_label}', ${b.order_count || 0})"
+                  disabled>
+            ✓ Confirm Audit
+          </button>
+          <button class="btn-ghost" onclick="closeAuditPanel('${b.id}')">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Expose audit panel functions globally (onclick handlers in innerHTML)
+window.openAuditPanel = function(batchId) {
+  const panel = document.getElementById('ap-' + batchId);
+  if (!panel) return;
+  panel.classList.add('open');
+  // Pre-fill "to" region based on op_zone_id — try matching by id first
+  const card = document.getElementById('bc-' + batchId);
+  const toSel = document.getElementById('to-' + batchId);
+  // Try to auto-match the op_zone_id to a region
+  const opZoneEl = card?.querySelector('.pill-blue');
+  if (opZoneEl) {
+    // Attempt to find a region whose label matches the op_zone_label
+    const opLabel = opZoneEl.textContent.trim().toLowerCase();
+    const match = REGIONS.find(r => r.label.toLowerCase() === opLabel || r.id === opLabel.replace(/\s+/g,'_'));
+    if (match) toSel.value = match.id;
+    updateFeeDisplay(batchId);
+  }
+};
+window.closeAuditPanel = function(batchId) {
+  const panel = document.getElementById('ap-' + batchId);
+  if (panel) panel.classList.remove('open');
+};
+window.updateFeeDisplay = function(batchId) {
+  const fromId = document.getElementById('from-' + batchId)?.value;
+  const toId   = document.getElementById('to-'   + batchId)?.value;
+  const display = document.getElementById('fee-display-' + batchId);
+  const confirmBtn = document.getElementById('btn-confirm-' + batchId);
+  if (!fromId || !toId) {
+    display.classList.add('no-fee');
+    display.innerHTML = '<div class="fee-amount">Select regions</div><div class="fee-label">to calculate shipping fee</div>';
+    confirmBtn.disabled = true; return;
+  }
+  try {
+    const fee = lookupFee(fromId, toId);
+    const fromLabel = REGIONS.find(r => r.id === fromId)?.label || fromId;
+    const toLabel   = REGIONS.find(r => r.id === toId  )?.label || toId;
+    display.classList.remove('no-fee');
+    display.innerHTML = `
+      <div class="fee-amount">${fee.toLocaleString()} EGP</div>
+      <div class="fee-label">${fromLabel} → ${toLabel}</div>`;
+    confirmBtn.disabled = false;
+  } catch(e) {
+    display.classList.add('no-fee');
+    display.innerHTML = '<div class="fee-amount">Lookup error</div><div class="fee-label">Region not found in matrix</div>';
+    confirmBtn.disabled = true;
+  }
+};
+
+window.confirmAudit = async function(batchId, agentId, agentName, opZoneId, opZoneLabel, orderCount) {
+  const fromId = document.getElementById('from-' + batchId)?.value;
+  const toId   = document.getElementById('to-'   + batchId)?.value;
+  if (!fromId || !toId) { showToast('Select both regions first', 'warning'); return; }
+
+  let fee;
+  try { fee = lookupFee(fromId, toId); } catch(e) { showToast('Fee lookup failed', 'error'); return; }
+
+  const fromLabel = REGIONS.find(r => r.id === fromId)?.label || fromId;
+  const toLabel   = REGIONS.find(r => r.id === toId  )?.label || toId;
+
+  const confirmed = await Swal.fire({
+    title: 'Confirm Audit',
+    html: `<b>${fromLabel} → ${toLabel}</b><br>
+           Shipping fee: <b style="color:#b22025;font-size:20px">${fee.toLocaleString()} EGP</b><br>
+           <small style="color:#6b7280">This will mark all ${orderCount} order(s) in this batch as audited.</small>`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Confirm',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#16a34a',
+  });
+  if (!confirmed.isConfirmed) return;
+
+  showLoader('Auditing batch…');
+  try {
+    const auditData = {
+      from_region_id:    fromId,
+      from_region_label: fromLabel,
+      to_region_id:      toId,
+      to_region_label:   toLabel,
+      shipping_fee:      fee,
+      audited_by:        session.passcode,
+      audited_by_name:   session.username,
+      audited_at:        serverTimestamp(),
+    };
+
+    // 1. Update the batch doc
+    await updateDoc(doc(db, 'ol_batches', batchId), {
+      status:            'audit_complete',
+      audit:             auditData,
+      audit_complete_at: serverTimestamp(),
+      audited_by:        session.passcode,
+    });
+
+    // 2. Batch-update all order docs in this batch (WriteBatch — 500 op limit)
+    // Fetch the order IDs from handover_log where batch_id matches
+    const ordersSnap = await getDocs(query(
+      collection(db, 'ol_handover_log'),
+      where('batch_id', '==', batchId),
+      where('store_id', '==', OL_STORE_ID)
+    ));
+
+    // WriteBatch in chunks of 400 to stay well within Firestore 500-op limit
+    const CHUNK = 400;
+    const orderDocs = ordersSnap.docs;
+    for (let start = 0; start < orderDocs.length; start += CHUNK) {
+      const wb = writeBatch(db);
+      orderDocs.slice(start, start + CHUNK).forEach(od => {
+        wb.update(od.ref, {
+          status: 'audited',
+          audit:  auditData,
+        });
+      });
+      await wb.commit();
+    }
+
+    hideLoader();
+    showToast(`Batch audited — ${fee} EGP (${fromLabel} → ${toLabel})`, 'success', 4000);
+
+    // Remove audited card from pending list
+    document.getElementById('bc-' + batchId)?.remove();
+    const remaining = parseInt(document.getElementById('audit-count').textContent || '0') - 1;
+    document.getElementById('audit-count').textContent = Math.max(0, remaining);
+    if (document.querySelectorAll('.batch-card').length === 0) {
+      document.getElementById('audit-list').innerHTML = '<div class="empty-state">✅ No batches pending audit</div>';
+    }
+  } catch(e) {
+    hideLoader(); showToast('Audit failed — try again', 'error');
+    console.error('[OL Admin] confirmAudit:', e);
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── ALL BATCHES ───────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+async function loadBatches() {
+  const from   = document.getElementById('b-from').value;
+  const to     = document.getElementById('b-to').value;
+  const status = document.getElementById('b-status').value;
+  if (!from || !to) { showToast('Select a date range', 'warning'); return; }
+
+  showLoader('Loading batches…');
+  try {
+    const fromTs = Timestamp.fromDate(new Date(from + 'T00:00:00'));
+    const toTs   = Timestamp.fromDate(new Date(to   + 'T23:59:59.999'));
+    const constraints = [
+      where('store_id', '==', OL_STORE_ID),
+      where('dispatched_at', '>=', fromTs),
+      where('dispatched_at', '<=', toTs),
+      orderBy('dispatched_at', 'desc'),
+      limit(300),
+    ];
+    if (status) constraints.splice(1, 0, where('status', '==', status));
+    const snap = await getDocs(query(collection(db, 'ol_batches'), ...constraints));
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    hideLoader();
+    renderBatches(rows);
+  } catch(e) {
+    hideLoader(); showToast('Query failed — building indexes?', 'error');
+    console.error('[OL Admin] loadBatches:', e);
+  }
+}
+
+function renderBatches(rows) {
+  const container = document.getElementById('batches-list');
+  if (!rows.length) { container.innerHTML = '<div class="empty-state">No batches found</div>'; return; }
+  const totalFees = rows.reduce((s,b) => s + (b.audit?.shipping_fee || 0), 0);
+  container.innerHTML = `
+    <div class="history-summary-bar" style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg);border-radius:var(--radius);margin-bottom:12px;font-size:13px">
+      <span>Results: <b>${rows.length}</b> batches</span>
+      ${totalFees ? `<span>Total fees: <b>${totalFees.toLocaleString()} EGP</b></span>` : ''}
+    </div>` +
+  rows.map(b => {
+    const ts = b.dispatched_at?.toDate?.();
+    const dateStr = ts ? ts.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : b.date || '—';
+    const statusClass = b.status === 'audit_complete' ? 's-audited' : 's-dispatched';
+    const statusLabel = b.status === 'audit_complete' ? 'Audited' : 'Dispatched';
+    const auditInfo = b.audit
+      ? `<br>💰 <b>${b.audit.shipping_fee} EGP</b> — ${b.audit.from_region_label} → ${b.audit.to_region_label}
+         <span style="color:var(--muted);font-size:11px">(by ${b.audit.audited_by_name || b.audit.audited_by})</span>`
+      : '';
+    return `<div class="order-row">
+      <div class="order-row-top">
+        <span class="order-row-id">${b.batch_code || b.id}</span>
+        <span class="status-badge pill ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="order-row-meta">
+        👤 ${b.agent_name || b.agent_id} &nbsp;·&nbsp;
+        <span class="pill pill-blue" style="padding:1px 7px">${b.op_zone_label || b.op_zone_id || '—'}</span>
+        ${b.order_count || 0} orders &nbsp;·&nbsp; 🕐 ${dateStr}
+        ${auditInfo}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetBatchFilters() {
+  const t = localDateStr();
+  document.getElementById('b-from').value = t;
+  document.getElementById('b-to').value   = t;
+  document.getElementById('b-status').value = '';
+  document.getElementById('batches-list').innerHTML = '<div class="empty-state">Use filters above to load batches</div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── ORDERS BROWSE ────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+
+async function loadOrders() {
+  const from   = document.getElementById('o-from').value;
+  const to     = document.getElementById('o-to').value;
+  const status = document.getElementById('o-status').value;
+  const search = document.getElementById('o-search').value.trim();
+
+  if (!from || !to) { showToast('Select a date range', 'warning'); return; }
+  showLoader('Loading orders…');
+  try {
+    const fromTs = Timestamp.fromDate(new Date(from + 'T00:00:00'));
+    const toTs   = Timestamp.fromDate(new Date(to   + 'T23:59:59.999'));
+    const constraints = [
+      where('store_id', '==', OL_STORE_ID),
+      where('created_at', '>=', fromTs),
+      where('created_at', '<=', toTs),
+      orderBy('created_at', 'desc'),
+      limit(500),
+    ];
+    if (status) constraints.splice(1, 0, where('status', '==', status));
+    const snap = await getDocs(query(collection(db, 'ol_handover_log'), ...constraints));
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (search) rows = rows.filter(r => String(r.order_id || '').includes(search));
+    hideLoader();
+    renderOrders(rows);
+  } catch(e) {
+    hideLoader(); showToast('Query failed', 'error');
+    console.error('[OL Admin] loadOrders:', e);
+  }
+}
+
+function renderOrders(rows) {
+  const container = document.getElementById('orders-list');
+  if (!rows.length) { container.innerHTML = '<div class="empty-state">No orders found</div>'; return; }
+  container.innerHTML = `<div style="font-size:13px;color:var(--muted);margin-bottom:10px">Results: <b>${rows.length}</b> orders</div>` +
+  rows.map(r => {
+    const ts = r.created_at?.toDate?.();
+    const dateStr = ts ? ts.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + ' ' + ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : r.date || '—';
+    const sc = { handed:'s-handed', delivered:'s-delivered', audited:'s-audited', returned:'s-returned' }[r.status] || 's-handed';
+    const sl = { handed:'Handed', delivered:'Delivered', audited:'Audited', returned:'Returned' }[r.status] || r.status;
+    return `<div class="order-row">
+      <div class="order-row-top">
+        <span class="order-row-id">${r.order_id || r.id}</span>
+        <span class="status-badge pill ${sc}">${sl}</span>
+      </div>
+      <div class="order-row-meta">
+        👤 ${r.agent_name || r.agent_id || '—'}
+        <span class="pill pill-blue" style="padding:1px 7px;font-size:10px">${r.op_zone_label || r.op_zone_id || '—'}</span>
+        <span class="pill pill-gray" style="padding:1px 7px;font-size:10px;font-family:monospace">${r.batch_code || '—'}</span>
+        &nbsp;🕐 ${dateStr}
+        ${r.audit ? `<br>💰 <b>${r.audit.shipping_fee} EGP</b> (${r.audit.from_region_label} → ${r.audit.to_region_label})` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetOrderFilters() {
+  const t = localDateStr();
+  document.getElementById('o-from').value  = t;
+  document.getElementById('o-to').value    = t;
+  document.getElementById('o-status').value = '';
+  document.getElementById('o-search').value = '';
+  document.getElementById('orders-list').innerHTML = '<div class="empty-state">Use filters above to load orders</div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── CONFIG / SETTINGS ────────────────────────────────════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+
+async function loadConfig() {
+  loadZones();
+  loadAgents();
+  checkMatrix();
+}
+
+// ─── Zones ────────────────────────────────────────────────────────────────────
+async function loadZones() {
+  try {
+    const snap = await getDocs(query(collection(db, 'ol_zones'), orderBy('order', 'asc')));
+    const zones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderZones(zones);
+  } catch(e) { console.error('[OL Admin] loadZones:', e); }
+}
+
+function renderZones(zones) {
+  const container = document.getElementById('zones-list');
+  if (!zones.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:16px">No zones configured</div>';
+    return;
+  }
+  container.innerHTML = zones.map(z => `
+    <div class="zone-item">
+      <div class="zone-item-info">
+        <div class="zone-item-label">${z.label}</div>
+        <div class="zone-item-order">Order: ${z.order ?? '—'} &nbsp;·&nbsp; Status: ${z.status || 'active'}</div>
+      </div>
+      <div class="zone-item-actions">
+        <button class="btn-ghost" onclick="toggleZoneStatus('${z.id}','${z.status || 'active'}','${z.label}')" style="font-size:11px;padding:6px 10px">
+          ${(z.status || 'active') === 'active' ? '⏸ Deactivate' : '▶ Activate'}
+        </button>
+        <button class="btn-red" onclick="deleteZone('${z.id}','${z.label}')" style="font-size:11px;padding:6px 10px">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function toggleAddForm(type, open) {
+  const form = document.getElementById(`add-${type}-form`);
+  const shouldOpen = open !== undefined ? open : !form.classList.contains('open');
+  form.classList.toggle('open', shouldOpen);
+}
+
+async function saveZone() {
+  const label = document.getElementById('new-zone-label').value.trim();
+  const order = parseInt(document.getElementById('new-zone-order').value) || 0;
+  if (!label) { showToast('Enter a zone label', 'warning'); return; }
+  const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  showLoader('Saving zone…');
+  try {
+    await setDoc(doc(db, 'ol_zones', id), {
+      label, order, status: 'active', created_at: serverTimestamp()
+    });
+    hideLoader(); showToast(`Zone "${label}" saved`, 'success');
+    document.getElementById('new-zone-label').value = '';
+    document.getElementById('new-zone-order').value = '';
+    toggleAddForm('zone', false);
+    loadZones();
+  } catch(e) { hideLoader(); showToast('Save failed', 'error'); }
+}
+
+window.toggleZoneStatus = async function(id, currentStatus, label) {
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  showLoader(`${newStatus === 'active' ? 'Activating' : 'Deactivating'} zone…`);
+  try {
+    await updateDoc(doc(db, 'ol_zones', id), { status: newStatus });
+    hideLoader(); showToast(`Zone "${label}" ${newStatus}`, 'success');
+    loadZones();
+  } catch(e) { hideLoader(); showToast('Update failed', 'error'); }
+};
+
+window.deleteZone = async function(id, label) {
+  if (!confirm(`Delete zone "${label}"? This cannot be undone.`)) return;
+  showLoader('Deleting…');
+  try {
+    await deleteDoc(doc(db, 'ol_zones', id));
+    hideLoader(); showToast(`Zone "${label}" deleted`, 'success'); loadZones();
+  } catch(e) { hideLoader(); showToast('Delete failed', 'error'); }
+};
+
+// ─── Agents ───────────────────────────────────────────────────────────────────
+async function loadAgents() {
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'agents'),
+      where('store_id', '==', OL_STORE_ID)
+    ));
+    const agents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAgents(agents);
+  } catch(e) { console.error('[OL Admin] loadAgents:', e); }
+}
+
+function renderAgents(agents) {
+  const container = document.getElementById('agents-list');
+  if (!agents.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:16px">No agents configured</div>';
+    return;
+  }
+  container.innerHTML = agents.map(a => `
+    <div class="agent-item">
+      <div class="agent-item-info">
+        <div class="agent-item-name">${a.name}</div>
+        <div class="agent-item-meta">ID: ${a.id} &nbsp;·&nbsp; Status: ${a.status || 'active'}</div>
+      </div>
+      <div class="agent-item-actions">
+        <button class="btn-ghost" onclick="toggleAgentStatus('${a.id}','${a.status || 'active'}','${a.name}')" style="font-size:11px;padding:6px 10px">
+          ${(a.status || 'active') === 'active' ? '⏸ Deactivate' : '▶ Activate'}
+        </button>
+        <button class="btn-red" onclick="deleteAgent('${a.id}','${a.name}')" style="font-size:11px;padding:6px 10px">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveAgent() {
+  const name = document.getElementById('new-agent-name').value.trim();
+  const id   = document.getElementById('new-agent-id').value.trim()
+    || name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  if (!name) { showToast('Enter an agent name', 'warning'); return; }
+  if (!id)   { showToast('Enter an agent ID', 'warning'); return; }
+  showLoader('Saving agent…');
+  try {
+    await setDoc(doc(db, 'agents', id), {
+      name, store_id: OL_STORE_ID, status: 'active', created_at: serverTimestamp()
+    });
+    hideLoader(); showToast(`Agent "${name}" saved`, 'success');
+    document.getElementById('new-agent-name').value = '';
+    document.getElementById('new-agent-id').value   = '';
+    toggleAddForm('agent', false);
+    loadAgents();
+  } catch(e) { hideLoader(); showToast('Save failed', 'error'); }
+}
+
+window.toggleAgentStatus = async function(id, currentStatus, name) {
+  const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  showLoader('Updating agent…');
+  try {
+    await updateDoc(doc(db, 'agents', id), { status: newStatus });
+    hideLoader(); showToast(`Agent "${name}" ${newStatus}`, 'success'); loadAgents();
+  } catch(e) { hideLoader(); showToast('Update failed', 'error'); }
+};
+
+window.deleteAgent = async function(id, name) {
+  if (!confirm(`Delete agent "${name}"? This cannot be undone.`)) return;
+  showLoader('Deleting…');
+  try {
+    await deleteDoc(doc(db, 'agents', id));
+    hideLoader(); showToast(`Agent "${name}" deleted`, 'success'); loadAgents();
+  } catch(e) { hideLoader(); showToast('Delete failed', 'error'); }
+};
+
+// ─── Shipping Matrix ──────────────────────────────────────────────────────────
+async function checkMatrix() {
+  document.getElementById('matrix-info').innerHTML = '<b>Status:</b> Checking…';
+  try {
+    const snap = await getDoc(doc(db, 'shipping_fees', 'matrix'));
+    if (!snap.exists()) {
+      document.getElementById('matrix-info').innerHTML =
+        '<b>Status:</b> ❌ Not seeded — click "Seed / Reset Matrix" to initialise.';
+    } else {
+      const d = snap.data();
+      const regionCount = d.regions?.length || '?';
+      const updatedAt = d.updated_at?.toDate?.()?.toLocaleString('en-GB') || '—';
+      document.getElementById('matrix-info').innerHTML =
+        `<b>Status:</b> ✅ Seeded &nbsp;·&nbsp; <b>Regions:</b> ${regionCount} &nbsp;·&nbsp;
+         <b>Version:</b> ${d.version || 1} &nbsp;·&nbsp; <b>Updated:</b> ${updatedAt}`;
+    }
+  } catch(e) {
+    document.getElementById('matrix-info').innerHTML = '<b>Status:</b> ⚠️ Check failed — ' + (e.message || 'unknown error');
+  }
+}
+
+async function seedMatrix() {
+  const confirmed = await Swal.fire({
+    title: 'Seed Shipping Matrix?',
+    html: `This will write all <b>47 × 47 = 2,209</b> fee cells to Firestore.<br>
+           Existing matrix will be <b>overwritten</b>.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Seed Matrix',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#b22025',
+  });
+  if (!confirmed.isConfirmed) return;
+
+  showLoader('Building costs map…');
+  try {
+    // Build nested costs object from embedded RAW_MATRIX
+    const costs = {};
+    const ids = REGIONS.map(r => r.id);
+    ids.forEach((fromId, i) => {
+      costs[fromId] = {};
+      ids.forEach((toId, j) => { costs[fromId][toId] = RAW_MATRIX[i][j]; });
+    });
+
+    // Symmetry check
+    let symOk = true;
+    for (let i = 0; i < ids.length && symOk; i++) {
+      for (let j = i+1; j < ids.length; j++) {
+        if (RAW_MATRIX[i][j] !== RAW_MATRIX[j][i]) { symOk = false; break; }
+      }
+    }
+    if (!symOk) { hideLoader(); showToast('Matrix symmetry check failed — data error', 'error'); return; }
+
+    document.getElementById('loader-text').textContent = 'Writing to Firestore…';
+    await setDoc(doc(db, 'shipping_fees', 'matrix'), {
+      regions:    REGIONS,
+      costs,
+      version:    1,
+      updated_at: serverTimestamp(),
+      updated_by: session.passcode,
+    });
+    hideLoader();
+    showToast('✅ Matrix seeded — 47 regions × 47 = 2,209 cells', 'success', 5000);
+    checkMatrix();
+  } catch(e) {
+    hideLoader(); showToast('Seed failed: ' + (e.message || 'unknown'), 'error');
+    console.error('[OL Admin] seedMatrix:', e);
+  }
+}
+
+// ── UI Helpers ────────────────────────────────────────────────────────────────
+function showLoader(text) {
+  document.getElementById('loader-text').textContent = text || 'Loading…';
+  document.getElementById('loader').classList.add('show');
+}
+function hideLoader() { document.getElementById('loader').classList.remove('show'); }
+
+function showToast(msg, type = 'info', duration = 3000) {
+  const wrap  = document.getElementById('toast-wrap');
+  const toast = document.createElement('div');
+  toast.className   = `toast ${type}`;
+  toast.textContent = msg;
+  wrap.appendChild(toast);
+  setTimeout(() => toast.remove(), duration + 400);
+}
+</script>
+</body>
+</html>
