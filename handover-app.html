@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloom — Branch Handover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+    :root {
+      --bloom:      #b22025;
+      --bloom-dark: #8a1a1e;
+      --bloom-bg:   #fdf2f2;
+      --surface:    #ffffff;
+      --bg:         #f3f4f8;
+      --text:       #111827;
+      --muted:      #6b7280;
+      --border:     #e5e7eb;
+      --radius:     10px;
+      --shadow-sm:  0 1px 3px rgba(0,0,0,.08);
+      --shadow-md:  0 4px 12px rgba(0,0,0,.12);
+      --transition: .18s ease;
+      --green:      #16a34a;   --green-bg:  #dcfce7;
+      --red:        #dc2626;   --red-bg:    #fee2e2;
+      --blue:       #2563eb;   --blue-bg:   #dbeafe;
+      --orange:     #d97706;   --orange-bg: #fff3cd;
+      --purple:     #7c3aed;   --purple-bg: #ede9fe;
+    }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+    h1,h2,h3 { font-family:'Sora',sans-serif; }
+    button { cursor:pointer; font-family:inherit; }
+    input,select { font-family:inherit; }
+
+    /* ── Login ─────────────────────────────────────────────── */
+    #loginScreen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); }
+    .login-card { background:var(--surface); border-radius:16px; box-shadow:var(--shadow-md); padding:48px 40px; width:100%; max-width:380px; text-align:center; }
+    .login-logo { font-size:48px; margin-bottom:12px; }
+    .login-card h1 { font-size:26px; color:var(--bloom); margin-bottom:4px; }
+    .login-sub { color:var(--muted); font-size:14px; margin-bottom:28px; }
+    .login-card input { width:100%; padding:12px 16px; border:1.5px solid var(--border); border-radius:var(--radius); font-size:18px; text-align:center; letter-spacing:6px; outline:none; transition:border-color var(--transition); margin-bottom:14px; }
+    .login-card input:focus { border-color:var(--bloom); }
+    .login-btn-full { width:100%; padding:13px; background:var(--bloom); color:#fff; border:none; border-radius:var(--radius); font-size:15px; font-weight:600; transition:background var(--transition); }
+    .login-btn-full:hover { background:var(--bloom-dark); }
+    .login-btn-full:disabled { opacity:.6; cursor:not-allowed; }
+    .error-msg { color:var(--red); font-size:13px; margin-top:10px; min-height:18px; }
+
+    /* ── Navbar ────────────────────────────────────────────── */
+    nav { background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; padding:0 20px; height:58px; position:sticky; top:0; z-index:100; box-shadow:var(--shadow-sm); }
+    .nav-brand { font-family:'Sora',sans-serif; font-weight:700; color:var(--bloom); font-size:17px; margin-right:12px; white-space:nowrap; }
+    .nav-tabs { display:flex; gap:2px; flex:1; }
+    .nav-tab { padding:7px 14px; border:none; background:transparent; color:var(--muted); border-radius:8px; font-size:13px; font-weight:500; transition:all var(--transition); }
+    .nav-tab:hover { background:var(--bg); color:var(--text); }
+    .nav-tab.active { background:var(--bloom-bg); color:var(--bloom); font-weight:600; }
+    .nav-right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+    .nav-user { font-size:12px; color:var(--muted); }
+    .btn-logout { padding:5px 12px; border:1.5px solid var(--border); background:transparent; border-radius:7px; font-size:12px; color:var(--muted); transition:all var(--transition); }
+    .btn-logout:hover { border-color:var(--bloom); color:var(--bloom); }
+
+    /* ── Tab Layout ────────────────────────────────────────── */
+    .tab-content { padding:22px 20px; max-width:1100px; margin:0 auto; }
+
+    /* ── Cards & Sections ──────────────────────────────────── */
+    .card-wrap { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); border:1px solid var(--border); overflow:hidden; }
+    .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .section-title { font-size:15px; font-weight:600; }
+    .section-count { font-size:13px; color:var(--muted); }
+
+    /* ── Order List ────────────────────────────────────────── */
+    .orders-list { display:flex; flex-direction:column; gap:10px; }
+    .order-card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); border:1px solid var(--border); overflow:hidden; transition:box-shadow var(--transition); }
+    .order-card:hover { box-shadow:var(--shadow-md); }
+    .order-card-head { display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid var(--border); }
+    .order-num { font-family:'Sora',sans-serif; font-weight:700; font-size:14px; }
+    .order-badge { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+    .badge-pending  { background:var(--orange-bg); color:var(--orange); }
+    .badge-assigned { background:var(--blue-bg);   color:var(--blue); }
+    .order-time { font-size:11px; color:var(--muted); margin-left:auto; }
+    .order-card-body { padding:10px 14px; display:grid; grid-template-columns:1fr 1fr; gap:6px 20px; }
+    .info-row { display:flex; flex-direction:column; }
+    .info-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; font-weight:600; }
+    .info-val { font-size:12px; color:var(--text); }
+    .fee-missing { color:var(--orange); font-weight:600; }
+    .order-card-actions { padding:8px 14px; border-top:1px solid var(--border); display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+
+    /* ── Checkboxes (batch selection) ──────────────────────── */
+    .order-check { width:18px; height:18px; accent-color:var(--bloom); cursor:pointer; flex-shrink:0; }
+
+    /* ── Buttons ───────────────────────────────────────────── */
+    .btn { padding:7px 16px; border-radius:8px; font-size:13px; font-weight:600; border:none; transition:all var(--transition); }
+    .btn-primary   { background:var(--bloom); color:#fff; }
+    .btn-primary:hover { background:var(--bloom-dark); }
+    .btn-secondary { background:var(--bg); color:var(--text); border:1.5px solid var(--border); }
+    .btn-secondary:hover { border-color:var(--bloom); color:var(--bloom); }
+    .btn-success   { background:var(--green-bg); color:var(--green); }
+    .btn-success:hover { background:var(--green); color:#fff; }
+    .btn:disabled  { opacity:.5; cursor:not-allowed; }
+
+    /* ── Fee Lookup ────────────────────────────────────────── */
+    .lookup-card { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-sm); border:1px solid var(--border); padding:20px; margin-bottom:20px; }
+    .lookup-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+    .lookup-row .form-group { flex:1; min-width:160px; }
+    .fee-result { font-family:'Sora',sans-serif; font-size:24px; font-weight:700; color:var(--bloom); margin-top:2px; }
+
+    /* ── Batch Builder ─────────────────────────────────────── */
+    .batch-toolbar {
+      position:sticky; bottom:0; background:var(--surface); border-top:2px solid var(--border);
+      padding:14px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      box-shadow:0 -4px 12px rgba(0,0,0,.08); z-index:50;
+    }
+    .batch-count { font-size:13px; font-weight:600; color:var(--bloom); }
+    .batch-driver-select { flex:1; min-width:200px; padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; outline:none; }
+    .batch-driver-select:focus { border-color:var(--bloom); }
+    .batch-note-input { flex:1; min-width:160px; padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; outline:none; }
+    .batch-note-input:focus { border-color:var(--bloom); }
+
+    /* ── Batch History ─────────────────────────────────────── */
+    .batch-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); }
+    .batch-row:last-child { border-bottom:none; }
+    .batch-id-chip { font-size:11px; font-family:monospace; background:var(--bg); padding:2px 6px; border-radius:4px; color:var(--muted); }
+
+    /* ── Form Elements ─────────────────────────────────────── */
+    .form-group { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+    .form-group:last-child { margin-bottom:0; }
+    .form-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+    .form-control { padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; outline:none; transition:border-color var(--transition); background:var(--surface); width:100%; }
+    .form-control:focus { border-color:var(--bloom); }
+    .fee-display-box { background:var(--bloom-bg); border:2px solid var(--bloom); border-radius:10px; padding:14px; text-align:center; margin-top:4px; }
+    .fee-display-label { font-size:11px; color:var(--bloom); font-weight:600; text-transform:uppercase; }
+    .fee-display-val { font-family:'Sora',sans-serif; font-size:28px; font-weight:700; color:var(--bloom); }
+
+    /* ── Modals ────────────────────────────────────────────── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px; }
+    .modal-card { background:var(--surface); border-radius:14px; box-shadow:var(--shadow-md); width:100%; max-width:440px; overflow:hidden; }
+    .modal-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .modal-title { font-family:'Sora',sans-serif; font-size:16px; font-weight:600; }
+    .modal-close { background:none; border:none; font-size:20px; color:var(--muted); padding:4px 8px; border-radius:6px; }
+    .modal-close:hover { background:var(--bg); }
+    .modal-body { padding:20px; }
+    .modal-footer { padding:12px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+    .modal-btn { padding:9px 20px; border-radius:8px; font-size:13px; font-weight:600; border:none; transition:all var(--transition); }
+    .modal-btn-primary { background:var(--bloom); color:#fff; }
+    .modal-btn-primary:hover { background:var(--bloom-dark); }
+    .modal-btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+    .modal-btn-cancel { background:var(--bg); color:var(--muted); }
+    .modal-error { color:var(--red); font-size:12px; margin-top:8px; min-height:16px; }
+
+    /* ── Misc ──────────────────────────────────────────────── */
+    .empty-state { text-align:center; color:var(--muted); font-size:14px; padding:40px; }
+    .loading     { text-align:center; color:var(--muted); padding:28px; font-size:13px; }
+    .tag { display:inline-block; background:var(--bg); color:var(--muted); border-radius:4px; font-size:10px; padding:2px 6px; }
+
+    /* ── Toast ─────────────────────────────────────────────── */
+    #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:#1f2937; color:#fff; padding:10px 22px; border-radius:10px; font-size:13px; font-weight:500; z-index:2000; opacity:0; transition:all .3s; white-space:nowrap; pointer-events:none; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.t-success { background:var(--green); }
+    #toast.t-error   { background:var(--red); }
+
+    @media (max-width:640px) {
+      .order-card-body { grid-template-columns:1fr; }
+      .lookup-row { flex-direction:column; }
+      nav { padding:0 12px; }
+      .nav-tab { padding:6px 10px; font-size:12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Login ──────────────────────────────────────────────────── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🌸</div>
+    <h1>Bloom</h1>
+    <p class="login-sub">Branch Handover Panel</p>
+    <form id="loginForm" autocomplete="off">
+      <input id="passcodeInput" type="password" placeholder="Staff Passcode" maxlength="20" autofocus>
+      <button type="submit" class="login-btn-full" id="loginBtn">Sign In</button>
+    </form>
+    <p class="error-msg" id="loginError"></p>
+  </div>
+</div>
+
+<!-- ── App Shell ──────────────────────────────────────────────── -->
+<div id="appShell" hidden>
+  <nav>
+    <div class="nav-brand">🌸 Bloom Branch</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="incoming" onclick="activateTab('incoming')">📥 Incoming</button>
+      <button class="nav-tab"        data-tab="batch"    onclick="activateTab('batch')">📦 Batch</button>
+      <button class="nav-tab"        data-tab="calc"     onclick="activateTab('calc')">🧮 Calculator</button>
+      <button class="nav-tab"        data-tab="history"  onclick="activateTab('history')">📋 History</button>
+    </div>
+    <div class="nav-right">
+      <span class="nav-user" id="navUser"></span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- ── INCOMING TAB ──────────────────────────────────────── -->
+  <div class="tab-content" id="tab-incoming">
+    <div class="section-header">
+      <span class="section-title">⏳ Pending Orders</span>
+      <span class="section-count" id="incomingCount"></span>
+    </div>
+    <div class="orders-list" id="incomingListEl"><div class="loading">Loading…</div></div>
+  </div>
+
+  <!-- ── BATCH TAB ─────────────────────────────────────────── -->
+  <div class="tab-content" id="tab-batch" hidden style="padding-bottom:100px">
+    <div class="section-header">
+      <span class="section-title">📦 Create Dispatch Batch</span>
+      <span class="section-count" id="batchSelCount">0 selected</span>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+      Select orders, choose a driver, then click <strong>Create Batch</strong>. All selected orders will be marked as Assigned.
+    </p>
+    <div class="orders-list" id="batchOrdersEl"><div class="loading">Loading…</div></div>
+
+    <!-- Sticky toolbar -->
+    <div class="batch-toolbar">
+      <span class="batch-count" id="batchSelLabel">0 orders selected</span>
+      <select class="batch-driver-select" id="batchDriverSelect">
+        <option value="">— Select Driver —</option>
+      </select>
+      <input class="batch-note-input" id="batchNote" type="text" placeholder="Batch notes (optional)" maxlength="200">
+      <button class="btn btn-primary" id="createBatchBtn" onclick="createBatch()">Create Batch</button>
+    </div>
+  </div>
+
+  <!-- ── CALCULATOR TAB ─────────────────────────────────────── -->
+  <div class="tab-content" id="tab-calc" hidden>
+    <div class="lookup-card">
+      <h3 style="margin-bottom:14px">47-Zone Fee Matrix Lookup</h3>
+      <div class="lookup-row">
+        <div class="form-group"><label class="form-label">From Area (Branch / Pickup)</label><select class="form-control" id="calcFrom" onchange="calcFee()"><option value="">— Select —</option></select></div>
+        <div class="form-group"><label class="form-label">To Area (Customer)</label><select class="form-control" id="calcTo" onchange="calcFee()"><option value="">— Select —</option></select></div>
+        <div class="form-group" style="min-width:120px"><label class="form-label">Calculated Fee</label><div class="fee-result" id="calcResult">—</div></div>
+      </div>
+    </div>
+
+    <!-- Area reference table grouped by cluster -->
+    <div class="section-header" style="margin-top:10px">
+      <span class="section-title">Delivery Zone Reference</span>
+      <span class="section-count" id="areaRefCount"></span>
+    </div>
+    <div class="card-wrap"><div id="areaRefEl"><div class="loading">Loading…</div></div></div>
+  </div>
+
+  <!-- ── HISTORY TAB ───────────────────────────────────────── -->
+  <div class="tab-content" id="tab-history" hidden>
+    <div class="section-header">
+      <span class="section-title">Today's Batches</span>
+      <span class="section-count" id="historyCount"></span>
+    </div>
+    <div class="card-wrap" id="historyEl"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<!-- ── Fee Assignment Modal ──────────────────────────────────── -->
+<div class="modal-overlay" id="modalFee" hidden>
+  <div class="modal-card">
+    <div class="modal-header"><span class="modal-title">Assign Fee — <span id="feeOrderLabel"></span></span><button class="modal-close" onclick="closeFeeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">From Area (Branch)</label><select class="form-control" id="feeFrom" onchange="recalcModalFee()"><option value="">— Select —</option></select></div>
+      <div class="form-group"><label class="form-label">To Area (Customer)</label><select class="form-control" id="feeTo" onchange="recalcModalFee()"><option value="">— Select —</option></select></div>
+      <div class="fee-display-box"><div class="fee-display-label">Shipping Fee</div><div class="fee-display-val" id="feeModalVal">—</div></div>
+      <p class="modal-error" id="feeModalError"></p>
+    </div>
+    <div class="modal-footer"><button class="modal-btn modal-btn-cancel" onclick="closeFeeModal()">Cancel</button><button class="modal-btn modal-btn-primary" id="confirmFeeBtn" onclick="confirmFee()">Confirm Fee</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp }               from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInAnonymously }  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  getFirestore, doc, collection,
+  getDoc, getDocs, setDoc, updateDoc, deleteDoc,
+  query, where, orderBy, limit, onSnapshot,
+  writeBatch, increment, serverTimestamp, Timestamp,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ─────────────────────────────────────────────────────────────
+// Config
+// ─────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyBnotQTRCsolWRY8OkQUjb68RV6N-alZg4",
+  authDomain:        "bloom-online-delivery.firebaseapp.com",
+  projectId:         "bloom-online-delivery",
+  storageBucket:     "bloom-online-delivery.firebasestorage.app",
+  messagingSenderId: "1083336380275",
+  appId:             "1:1083336380275:web:a8e80a8e4de6e6a40ebf06",
+};
+
+const SESSION_KEY = 'bloom_handover_session_v1';
+const AREAS_KEY   = 'bloom_ho_areas';
+const MATRIX_KEY  = 'bloom_ho_matrix';
+const TTL_30M     = 30 * 60 * 1000;
+const SESSION_TTL =  8 * 60 * 60 * 1000;
+
+const CLUSTER_LABELS = {
+  western:'West Cairo',northern:'North Cairo',southern:'South Cairo',
+  eastern:'East Cairo',october:'6th October / Pyramids',
+  sheikh_zayed:'Sheikh Zayed',new_cairo:'New Cairo',outer:'Outer Areas',
+};
+
+// ─────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────
+let db, auth;
+let _user        = null;
+let _matrixCache = null;
+let _areasCache  = null;
+let _agentsCache = null;
+let _activeTab   = 'incoming';
+let _ordersUnsub = null;
+let _feeOrderId  = null;
+const _selected  = new Set(); // batch selection: order IDs
+
+// ─────────────────────────────────────────────────────────────
+// Cache helpers
+// ─────────────────────────────────────────────────────────────
+function lsGet(k) {
+  try{const{ts,data}=JSON.parse(localStorage.getItem(k)||'null')||{};if(!ts||Date.now()-ts>TTL_30M){localStorage.removeItem(k);return null;}return data;}catch{return null;}
+}
+function lsSet(k,d){try{localStorage.setItem(k,JSON.stringify({ts:Date.now(),data:d}));}catch{}}
+function sessionSave(d){try{localStorage.setItem(SESSION_KEY,JSON.stringify(d));}catch{}}
+function sessionLoad(){
+  try{const d=JSON.parse(localStorage.getItem(SESSION_KEY));if(!d||Date.now()-d.ts>SESSION_TTL){localStorage.removeItem(SESSION_KEY);return null;}return d;}catch{localStorage.removeItem(SESSION_KEY);return null;}
+}
+function sessionClear(){try{localStorage.removeItem(SESSION_KEY);}catch{}}
+
+// ─────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────
+const _app = initializeApp(firebaseConfig);
+db   = getFirestore(_app);
+auth = getAuth(_app);
+
+(async () => {
+  await signInAnonymously(auth).catch(()=>{});
+  const session = sessionLoad();
+  if (session) {
+    _user = session;
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      _user.uid = uid;
+      await setDoc(doc(db,'sessions',uid),{userId:_user.userId,role:_user.role,displayName:_user.displayName,createdAt:serverTimestamp()}).catch(()=>{});
+    }
+    showApp();
+  } else {
+    document.getElementById('loginScreen').hidden = false;
+  }
+})();
+
+// ─────────────────────────────────────────────────────────────
+// Login
+// ─────────────────────────────────────────────────────────────
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const passcode = document.getElementById('passcodeInput').value.trim();
+  const errEl    = document.getElementById('loginError');
+  const btn      = document.getElementById('loginBtn');
+  errEl.textContent=''; if (!passcode) return;
+  btn.disabled=true; btn.textContent='Signing in…';
+  try {
+    if (!auth.currentUser) await signInAnonymously(auth).catch(()=>{});
+    if (!auth.currentUser) throw new Error('Network error');
+
+    let matchedUser = null;
+    try {
+      const snap = await getDoc(doc(db,'config','staffPasscodes'));
+      if (snap.exists()) {
+        const entry=(snap.data().codes||{})[passcode];
+        if (entry?.userId&&entry?.role&&entry?.displayName) matchedUser=entry;
+      }
+    } catch {}
+
+    if (!matchedUser) {
+      const LOCAL={'3664':{userId:'admin_core',role:'admin',displayName:'Admin Core'}};
+      matchedUser=LOCAL[passcode]||null;
+    }
+    if (!matchedUser) throw new Error('Invalid passcode. Please try again.');
+
+    const uid=auth.currentUser.uid;
+    await setDoc(doc(db,'sessions',uid),{userId:matchedUser.userId,role:matchedUser.role,displayName:matchedUser.displayName,createdAt:serverTimestamp()});
+    _user={...matchedUser,uid,ts:Date.now()};
+    sessionSave(_user);
+    showApp();
+  } catch(err) { errEl.textContent=err.message||'Sign-in failed.'; }
+  finally { btn.disabled=false; btn.textContent='Sign In'; }
+});
+
+async function doLogout() {
+  if (!confirm('Sign out?')) return;
+  if (_ordersUnsub){_ordersUnsub();_ordersUnsub=null;}
+  if (auth.currentUser?.uid) await deleteDoc(doc(db,'sessions',auth.currentUser.uid)).catch(()=>{});
+  sessionClear(); _user=null;
+  document.getElementById('appShell').hidden=true;
+  document.getElementById('loginScreen').hidden=false;
+  document.getElementById('passcodeInput').value='';
+}
+
+function showApp() {
+  document.getElementById('loginScreen').hidden=true;
+  document.getElementById('appShell').hidden=false;
+  document.getElementById('navUser').textContent=_user.displayName;
+  loadMatrix().catch(()=>{});
+  loadAreas().catch(()=>{});
+  loadAgents().catch(()=>{});
+  activateTab('incoming');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tab Navigation
+// ─────────────────────────────────────────────────────────────
+function activateTab(tab) {
+  if (_ordersUnsub){_ordersUnsub();_ordersUnsub=null;}
+  _activeTab=tab;
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.querySelectorAll('.tab-content').forEach(c=>{c.hidden=true;});
+  document.getElementById(`tab-${tab}`).hidden=false;
+  if (tab==='incoming') setupIncoming();
+  if (tab==='batch')    setupBatch();
+  if (tab==='calc')     setupCalc();
+  if (tab==='history')  setupHistory();
+}
+
+// ─────────────────────────────────────────────────────────────
+// INCOMING TAB — live pending orders
+// ─────────────────────────────────────────────────────────────
+function setupIncoming() {
+  const q=query(collection(db,'orders'),where('status','==','pending'),orderBy('createdAt','desc'),limit(80));
+  _ordersUnsub=onSnapshot(q,snap=>{
+    if(snap.metadata.hasPendingWrites) return;
+    renderIncoming(snap.docs);
+  });
+}
+
+function renderIncoming(docs) {
+  document.getElementById('incomingCount').textContent=`${docs.length} order${docs.length!==1?'s':''}`;
+  const el=document.getElementById('incomingListEl');
+  if(!docs.length){el.innerHTML='<div class="empty-state">No pending orders — all dispatched ✓</div>';return;}
+  el.innerHTML=docs.map(d=>{
+    const o=d.data();
+    const fee=o.shippingFee!=null?`${o.shippingFee} EGP`:`<span class="fee-missing">Missing</span>`;
+    const city=esc(o.shippingAddress?.city||'');
+    return `<div class="order-card">
+      <div class="order-card-head">
+        <span class="order-num">${esc(o.shopifyOrderName)}</span>
+        <span class="order-badge badge-pending">Pending</span>
+        ${o.financialStatus?`<span class="tag">${esc(o.financialStatus)}</span>`:''}
+        <span class="order-time">${timeAgo(o.createdAt?.toDate?.())}</span>
+      </div>
+      <div class="order-card-body">
+        <div class="info-row"><span class="info-label">Customer</span><span class="info-val">${esc(o.customer?.firstName)} ${esc(o.customer?.lastName)}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-val">${esc(o.customer?.phone||'—')}</span></div>
+        <div class="info-row"><span class="info-label">Area</span><span class="info-val">${city}</span></div>
+        <div class="info-row"><span class="info-label">Shipping Fee</span><span class="info-val">${fee}</span></div>
+      </div>
+      <div class="order-card-actions">
+        ${o.shippingFee==null?`<button class="btn btn-secondary" onclick="openFeeModal('${d.id}','${esc(o.shopifyOrderName)}','${city}')">Assign Fee</button>`:''}
+        <button class="btn btn-primary" style="margin-left:auto" onclick="activateTab('batch')">→ Batch</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// BATCH TAB — select orders + create batch
+// ─────────────────────────────────────────────────────────────
+async function setupBatch() {
+  _selected.clear();
+  updateBatchSelLabel();
+  document.getElementById('batchOrdersEl').innerHTML='<div class="loading">Loading…</div>';
+
+  // Populate driver selector
+  const agents=await loadAgents();
+  const sel=document.getElementById('batchDriverSelect');
+  sel.innerHTML='<option value="">— Select Driver —</option>'+
+    agents.filter(a=>a.isActive).map(a=>`<option value="${esc(a.agentId)}" data-name="${esc(a.displayName)}">${esc(a.displayName)}</option>`).join('');
+
+  // Load pending + assigned orders (unfinished, assignable)
+  const snap=await getDocs(query(collection(db,'orders'),where('status','==','pending'),orderBy('createdAt','asc'),limit(60)));
+  renderBatchOrders(snap.docs);
+}
+
+function renderBatchOrders(docs) {
+  const el=document.getElementById('batchOrdersEl');
+  if(!docs.length){el.innerHTML='<div class="empty-state">No pending orders to batch.</div>';return;}
+  el.innerHTML=docs.map(d=>{
+    const o=d.data();
+    const city=esc(o.shippingAddress?.city||'');
+    const checked=_selected.has(d.id)?'checked':'';
+    const fee=o.shippingFee!=null?`${o.shippingFee} EGP`:`<span class="fee-missing">No fee</span>`;
+    return `<div class="order-card">
+      <div class="order-card-head">
+        <input type="checkbox" class="order-check" ${checked} onchange="toggleSelect('${d.id}',this.checked)">
+        <span class="order-num">${esc(o.shopifyOrderName)}</span>
+        <span class="order-time">${timeAgo(o.createdAt?.toDate?.())}</span>
+      </div>
+      <div class="order-card-body">
+        <div class="info-row"><span class="info-label">Customer</span><span class="info-val">${esc(o.customer?.firstName)} ${esc(o.customer?.lastName)}</span></div>
+        <div class="info-row"><span class="info-label">Area / City</span><span class="info-val">${city}</span></div>
+        <div class="info-row"><span class="info-label">Shipping Fee</span><span class="info-val">${fee}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-val">${esc(o.customer?.phone||'—')}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSelect(orderId, checked) {
+  if (checked) _selected.add(orderId); else _selected.delete(orderId);
+  updateBatchSelLabel();
+}
+
+function updateBatchSelLabel() {
+  const n=_selected.size;
+  document.getElementById('batchSelCount').textContent=`${n} selected`;
+  document.getElementById('batchSelLabel').textContent=`${n} order${n!==1?'s':''} selected`;
+}
+
+async function createBatch() {
+  if (!_selected.size) { showToast('Select at least one order','t-error'); return; }
+  const sel   = document.getElementById('batchDriverSelect');
+  const aId   = sel.value;
+  const aName = sel.selectedOptions[0]?.dataset.name;
+  if (!aId)   { showToast('Select a driver','t-error'); return; }
+  const notes = document.getElementById('batchNote').value.trim();
+  const btn   = document.getElementById('createBatchBtn');
+  btn.disabled=true; btn.textContent='Creating…';
+
+  try {
+    const orderIds = [..._selected];
+    const batchId  = `B_${Date.now().toString(36).toUpperCase().slice(-8)}`;
+    const now      = serverTimestamp();
+    const batch    = writeBatch(db);
+
+    // Create batch document
+    batch.set(doc(db,'batches',batchId),{
+      batchId, agentId:aId, agentName:aName,
+      orderIds, orderCount:orderIds.length,
+      status:'pending', createdBy:_user.userId,
+      createdAt:now, completedAt:null, notes:notes||null,
+    });
+
+    // Update each order + dailyStats
+    orderIds.forEach(ordId=>{
+      batch.update(doc(db,'orders',ordId),{
+        status:'assigned', assignedAgentId:aId, assignedAgentName:aName,
+        assignedAt:now, batchId, updatedAt:now,
+      });
+    });
+
+    // Update dailyStats: pending -= n, assigned += n
+    batch.update(doc(db,'dailyStats',todayStr()),{
+      pending:   increment(-orderIds.length),
+      assigned:  increment(orderIds.length),
+      lastUpdatedAt: now,
+    });
+
+    await batch.commit();
+    _selected.clear();
+    showToast(`Batch ${batchId} created — ${orderIds.length} orders assigned to ${aName}`,'t-success');
+    setupBatch(); // refresh
+  } catch(err) {
+    console.error(err); showToast('Failed to create batch','t-error');
+  } finally { btn.disabled=false; btn.textContent='Create Batch'; }
+}
+
+// ─────────────────────────────────────────────────────────────
+// CALCULATOR TAB — fee lookup + area reference
+// ─────────────────────────────────────────────────────────────
+async function setupCalc() {
+  await Promise.all([loadAreas(), loadMatrix().catch(()=>{})]);
+  populateCalcSelects();
+  renderAreaReference();
+}
+
+function populateCalcSelects() {
+  if (!_areasCache) return;
+  ['calcFrom','calcTo'].forEach(id=>populateAreaSelect(id,_areasCache));
+}
+
+function calcFee() {
+  const from=document.getElementById('calcFrom').value, to=document.getElementById('calcTo').value;
+  const fee=(from&&to)?lookupFee(from,to):null;
+  document.getElementById('calcResult').textContent=fee!=null?`${fee} EGP`:(from&&to?'Not found':'—');
+}
+
+function renderAreaReference() {
+  const el=document.getElementById('areaRefEl');
+  if (!_areasCache){el.innerHTML='<div class="loading">Loading areas…</div>';return;}
+  const active=_areasCache.filter(a=>a.isActive);
+  document.getElementById('areaRefCount').textContent=`${active.length} active zones`;
+  const grouped={};
+  active.forEach(a=>(grouped[a.cluster]=grouped[a.cluster]||[]).push(a));
+  el.innerHTML='<table style="width:100%;border-collapse:collapse">'+
+    '<thead><tr style="background:var(--bg)">'+
+    '<th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600">Zone</th>'+
+    '<th style="padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600">Cluster</th>'+
+    '<th style="padding:10px 14px;text-align:right;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600">Sort</th>'+
+    '</tr></thead><tbody>'+
+    Object.entries(grouped).flatMap(([cluster,list])=>
+      list.map((a,i)=>`<tr style="border-top:1px solid var(--border);${i===0?'border-top:2px solid var(--bloom-dark)':''}">
+        <td style="padding:9px 14px;font-size:13px;font-weight:600">${esc(a.name)}</td>
+        <td style="padding:9px 14px;font-size:12px;color:var(--muted)">${CLUSTER_LABELS[a.cluster]||a.cluster}</td>
+        <td style="padding:9px 14px;font-size:12px;color:var(--muted);text-align:right">${a.sortOrder}</td>
+      </tr>`)
+    ).join('')+'</tbody></table>';
+}
+
+// ─────────────────────────────────────────────────────────────
+// HISTORY TAB — today's batches
+// ─────────────────────────────────────────────────────────────
+async function setupHistory() {
+  const el=document.getElementById('historyEl');
+  el.innerHTML='<div class="loading">Loading…</div>';
+  const todayMid=new Date(); todayMid.setHours(0,0,0,0);
+  try {
+    const snap=await getDocs(query(collection(db,'batches'),where('createdAt','>=',Timestamp.fromDate(todayMid)),orderBy('createdAt','desc'),limit(30)));
+    document.getElementById('historyCount').textContent=`${snap.size} batch${snap.size!==1?'es':''}`;
+    if(!snap.size){el.innerHTML='<div class="empty-state">No batches created today.</div>';return;}
+    el.innerHTML=snap.docs.map(d=>{
+      const b=d.data();
+      const statusColor=b.status==='completed'?'var(--green)':b.status==='pending'?'var(--orange)':'var(--muted)';
+      return `<div class="batch-row">
+        <span class="batch-id-chip">${esc(b.batchId||d.id)}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${esc(b.agentName||'—')}</div>
+          <div style="font-size:11px;color:var(--muted)">${b.orderCount||0} orders · ${timeAgo(b.createdAt?.toDate?.())}</div>
+        </div>
+        <span class="order-badge" style="background:${statusColor}22;color:${statusColor}">${b.status}</span>
+        ${b.notes?`<span style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${esc(b.notes)}">${esc(b.notes)}</span>`:''}
+      </div>`;
+    }).join('');
+  } catch(err) { el.innerHTML=`<div class="empty-state">Error: ${err.message}</div>`; }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEE MODAL
+// ─────────────────────────────────────────────────────────────
+async function openFeeModal(orderId, orderName, cityHint) {
+  _feeOrderId=orderId;
+  document.getElementById('feeOrderLabel').textContent=orderName;
+  document.getElementById('feeModalVal').textContent='—';
+  document.getElementById('feeModalError').textContent='';
+  document.getElementById('confirmFeeBtn').disabled=false;
+  document.getElementById('confirmFeeBtn').textContent='Confirm Fee';
+  const [areas]=await Promise.all([loadAreas(),loadMatrix().catch(()=>{})]);
+  populateAreaSelect('feeFrom',areas); populateAreaSelect('feeTo',areas);
+  if(cityHint){
+    const sel=document.getElementById('feeTo');
+    const hit=[...sel.options].find(o=>o.value.toLowerCase().includes(cityHint.toLowerCase())||cityHint.toLowerCase().includes(o.value.toLowerCase().split(' ')[0]));
+    if(hit) sel.value=hit.value;
+  }
+  recalcModalFee();
+  document.getElementById('modalFee').hidden=false;
+}
+function closeFeeModal(){document.getElementById('modalFee').hidden=true;_feeOrderId=null;}
+function recalcModalFee(){
+  const from=document.getElementById('feeFrom').value,to=document.getElementById('feeTo').value;
+  const fee=(from&&to)?lookupFee(from,to):null;
+  document.getElementById('feeModalVal').textContent=fee!=null?`${fee} EGP`:(from&&to?'Route not in matrix':'—');
+}
+
+async function confirmFee(){
+  const from=document.getElementById('feeFrom').value,to=document.getElementById('feeTo').value,fee=lookupFee(from,to);
+  if(!from||!to){document.getElementById('feeModalError').textContent='Select both areas.';return;}
+  if(fee==null){document.getElementById('feeModalError').textContent='No fee for this route.';return;}
+  const btn=document.getElementById('confirmFeeBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  try{
+    const batch=writeBatch(db);
+    batch.update(doc(db,'orders',_feeOrderId),{fromArea:from,toArea:to,shippingFee:fee,feeAssignedBy:_user.userId,feeAssignedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    batch.set(doc(db,'shippingPricing',_feeOrderId),{orderId:_feeOrderId,fromArea:from,toArea:to,shippingFee:fee,assignedBy:_user.userId,assignedAt:serverTimestamp(),matrixVersion:_matrixCache?.version||1,isOverride:false,overrideReason:null});
+    batch.update(doc(db,'dailyStats',todayStr()),{totalShippingFees:increment(fee),lastUpdatedAt:serverTimestamp()});
+    await batch.commit();
+    showToast(`Fee saved: ${fee} EGP (${from} → ${to})`,'t-success');
+    closeFeeModal();
+    if(_activeTab==='incoming') setupIncoming();
+  }catch(err){console.error(err);document.getElementById('feeModalError').textContent='Failed — try again.';btn.disabled=false;btn.textContent='Confirm Fee';}
+}
+
+// ─────────────────────────────────────────────────────────────
+// Data loaders
+// ─────────────────────────────────────────────────────────────
+async function loadMatrix(){
+  if(_matrixCache) return _matrixCache;
+  const c=lsGet(MATRIX_KEY);if(c){_matrixCache=c;return _matrixCache;}
+  const snap=await getDoc(doc(db,'config','shippingMatrix'));
+  if(!snap.exists()) throw new Error('Matrix not found');
+  _matrixCache=snap.data();lsSet(MATRIX_KEY,_matrixCache);return _matrixCache;
+}
+async function loadAreas(){
+  if(_areasCache) return _areasCache;
+  const c=lsGet(AREAS_KEY);if(c){_areasCache=c;return _areasCache;}
+  const snap=await getDocs(collection(db,'deliveryAreas'));
+  _areasCache=snap.docs.map(d=>d.data()).sort((a,b)=>a.sortOrder-b.sortOrder);
+  lsSet(AREAS_KEY,_areasCache);return _areasCache;
+}
+async function loadAgents(){
+  if(_agentsCache) return _agentsCache;
+  const snap=await getDocs(query(collection(db,'agents'),orderBy('displayName')));
+  _agentsCache=snap.docs.map(d=>d.data());return _agentsCache;
+}
+function lookupFee(from,to){return _matrixCache?.prices?.[from]?.[to]??null;}
+
+function populateAreaSelect(id,areas){
+  const sel=document.getElementById(id),grouped={};
+  areas.forEach(a=>{if(!a.isActive)return;(grouped[a.cluster]=grouped[a.cluster]||[]).push(a);});
+  sel.innerHTML='<option value="">— Select area —</option>';
+  Object.entries(grouped).forEach(([cluster,list])=>{
+    const g=document.createElement('optgroup');g.label=CLUSTER_LABELS[cluster]||cluster;
+    list.forEach(a=>{const o=document.createElement('option');o.value=a.name;o.textContent=a.name;g.appendChild(o);});
+    sel.appendChild(g);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function timeAgo(date){
+  if(!date) return '';
+  const m=Math.floor((Date.now()-date.getTime())/60000);
+  if(m<1) return 'just now';if(m<60) return `${m}m ago`;
+  const h=Math.floor(m/60);if(h<24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+function esc(str){
+  if(str==null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+let _toastTimer;
+function showToast(msg,type='',ms=3000){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className=type||'';
+  requestAnimationFrame(()=>el.classList.add('show'));
+  clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>el.classList.remove('show'),ms);
+}
+document.getElementById('modalFee').addEventListener('click',e=>{if(e.target===e.currentTarget)closeFeeModal();});
+Object.assign(window,{activateTab,doLogout,calcFee,openFeeModal,closeFeeModal,recalcModalFee,confirmFee,toggleSelect,createBatch});
+</script>
+</body>
+</html>
