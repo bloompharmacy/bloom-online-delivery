@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloom — Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bloom: #b22025;
+      --bloom-dark: #8a1a1e;
+      --bloom-light: #fdf2f2;
+      --surface: #ffffff;
+      --bg: #f3f4f8;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --radius: 10px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.12);
+      --transition: .18s ease;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    h1,h2,h3,h4 { font-family: 'Sora', sans-serif; }
+    button { cursor: pointer; font-family: inherit; }
+    input, select { font-family: inherit; }
+    
+    /* Login Screen */
+    #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+    .login-card { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-md); padding: 48px 40px; width: 100%; max-width: 380px; text-align: center; }
+    .login-logo { font-size: 48px; margin-bottom: 12px; }
+    .login-card h1 { font-size: 28px; color: var(--bloom); margin-bottom: 4px; }
+    .login-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
+    .login-card input { width: 100%; padding: 12px 16px; border: 1.5px solid var(--border); border-radius: var(--radius); font-size: 18px; text-align: center; outline: none; margin-bottom: 16px; }
+    .login-card input:focus { border-color: var(--bloom); }
+    .login-card button { width: 100%; padding: 13px; background: var(--bloom); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; transition: background var(--transition); }
+    .login-card button:hover { background: var(--bloom-dark); }
+    
+    /* App Layout */
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; height: 60px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-sm); }
+    .nav-brand { font-weight: 700; color: var(--bloom); font-size: 18px; margin-right: 24px; }
+    .nav-tabs { display: flex; gap: 8px; }
+    .nav-tab { padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); border-radius: 8px; font-size: 14px; font-weight: 500; transition: all var(--transition); }
+    .nav-tab:hover { background: var(--bg); color: var(--text); }
+    .nav-tab.active { background: var(--bloom-light); color: var(--bloom); font-weight: 600; }
+    .tab-content { padding: 24px 20px; max-width: 1100px; margin: 0 auto; }
+    
+    /* Grid & Widgets */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .kpi-card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-sm); border-left: 4px solid var(--bloom); }
+    .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px; }
+    .kpi-value { font-size: 28px; font-weight: 700; }
+    .card-wrap { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border); padding: 20px; }
+    
+    /* Dropdowns & Forms */
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+    .form-control { padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; background: var(--surface); width: 100%; }
+    .form-control:focus { border-color: var(--bloom); }
+    
+    /* Fee Box */
+    .fee-display-box { background: var(--bloom-light); border: 2px solid var(--bloom); border-radius: 10px; padding: 20px; text-align: center; margin-top: 16px; }
+    .fee-display-label { font-size: 12px; color: var(--bloom); font-weight: 600; text-transform: uppercase; }
+    .fee-display-val { font-size: 32px; font-weight: 700; color: var(--bloom); margin-top: 4px; }
+    
+    /* Toast Alert */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1f2937; color: #fff; padding: 12px 24px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 2000; opacity: 0; transition: all .3s ease; display: none; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">🌸</div>
+    <h1>Bloom</h1>
+    <p class="login-sub">Online Store Dashboard</p>
+    <form id="loginForm" onsubmit="event.preventDefault(); doLogin();">
+      <input id="passInput" type="password" placeholder="Passcode" autofocus>
+      <button type="submit">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<div id="appShell" hidden>
+  <nav>
+    <div class="nav-brand">🌸 Bloom Panel</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="nav-tab" onclick="switchTab('calculator')">Shipping Calculator</button>
+    </div>
+  </nav>
+
+  <div id="tab-dashboard" class="tab-content">
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total Today</div><div class="kpi-value" id="kpiTotal">0</div></div>
+      <div class="kpi-card"><div class="kpi-label">Pending Orders</div><div class="kpi-value" id="kpiPending">0</div></div>
+      <div class="kpi-card"><div class="kpi-label">Delivered</div><div class="kpi-value" id="kpiDelivered">0</div></div>
+    </div>
+    <div class="card-wrap">
+      <h3>Active System Overview</h3>
+      <p style="margin-top: 10px; color: var(--text-muted);">Welcome to the Bloom Pharmacy logistics control core. Select the Shipping Calculator tab to compute real-time delivery pricing matrix parameters.</p>
+    </div>
+  </div>
+
+  <div id="tab-calculator" class="tab-content" hidden>
+    <div class="card-wrap" style="max-width: 500px; margin: 0 auto;">
+      <h3 style="margin-bottom: 20px; text-align: center;">Assign & Lookup Shipping Fee</h3>
+      <div class="form-group">
+        <label class="form-label">From Area (Pickup / Branch)</label>
+        <select class="form-control" id="feeFromArea" onchange="runFeeCalculation()">
+          <option value="">— Select branch area —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">To Area (Customer Destination)</label>
+        <select class="form-control" id="feeToArea" onchange="runFeeCalculation()">
+          <option value="">— Select customer area —</option>
+        </select>
+      </div>
+      <div class="fee-display-box">
+        <div class="fee-display-label">Calculated Shipping Fee</div>
+        <div class="fee-display-val" id="feeDisplayVal">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBnotQTRCsolWRY8OkQUjb68RV6N-alZg4",
+    authDomain: "bloom-online-delivery.firebaseapp.com",
+    projectId: "bloom-online-delivery",
+    storageBucket: "bloom-online-delivery.firebasestorage.app",
+    messagingSenderId: "1083336380275",
+    appId: "1:1083336380275:web:a8e80a8e4de6e6a40ebf06",
+    measurementId: "G-VPT8W9WNHF"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  let _matrixData = null;
+  let _user = null;
+
+  async function doLogin() {
+    const code = document.getElementById('passInput').value.trim();
+    if(!code) return;
+
+    if(code === '3664') {
+      _user = { role: 'admin' };
+      document.getElementById('loginScreen').hidden = true;
+      document.getElementById('appShell').hidden = false;
+      showToast('Login Successful');
+      await initApp();
+    } else {
+      alert('Wrong passcode. Access Denied.');
+    }
+  }
+
+  async function initApp() {
+    try {
+      await loadShippingMatrix();
+      await populateDropdowns();
+    } catch (e) {
+      console.error("Initialization pipeline halt:", e);
+    }
+  }
+
+  async function loadShippingMatrix() {
+    const snap = await getDoc(doc(db, 'config', 'shippingMatrix'));
+    if (snap.exists()) {
+      _matrixData = snap.data();
+    }
+  }
+
+  async function populateDropdowns() {
+    const snap = await getDocs(collection(db, 'deliveryAreas'));
+    const areas = snap.docs.map(d => d.data().name).sort();
+    
+    const fromSelect = document.getElementById('feeFromArea');
+    const toSelect = document.getElementById('feeToArea');
+    
+    const optionsHtml = areas.map(name => `<option value="${name}">${name}</option>`).join('');
+    
+    fromSelect.innerHTML = '<option value="">— Select branch area —</option>' + optionsHtml;
+    toSelect.innerHTML = '<option value="">— Select customer area —</option>' + optionsHtml;
+  }
+
+  function runFeeCalculation() {
+    const from = document.getElementById('feeFromArea').value;
+    const to = document.getElementById('feeToArea').value;
+    const display = document.getElementById('feeDisplayVal');
+    
+    if(!from || !to) { display.textContent = '—'; return; }
+    
+    const fee = _matrixData?.prices?.[from]?.[to];
+    display.textContent = fee != null ? `${fee} EGP` : 'Not Found';
+  }
+
+  function switchTab(tabId) {
+    document.getElementById('tab-dashboard').hidden = tabId !== 'dashboard';
+    document.getElementById('tab-calculator').hidden = tabId !== 'calculator';
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('onclick').includes(tabId));
+    });
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.classList.add('show');
+    setTimeout(() => { el.classList.remove('show'); el.style.display = 'none'; }, 3000);
+  }
+
+  window.doLogin = doLogin;
+  window.switchTab = switchTab;
+  window.runFeeCalculation = runFeeCalculation;
+</script>
+</body>
+</html>
