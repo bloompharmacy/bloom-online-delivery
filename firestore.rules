@@ -1,0 +1,211 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthed() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Session-based staff check (Spark plan: passcode login writes /sessions/{uid})
+    function hasSession() {
+      return isAuthed() &&
+             exists(/databases/$(database)/documents/sessions/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.role
+               in ['admin', 'staff', 'super_admin'];
+    }
+
+    // UID-based staff check (future Blaze: UID stored in /users)
+    function isUserRecord() {
+      return isAuthed() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function isStaff() {
+      return hasSession() || isUserRecord();
+    }
+
+    function isAdmin() {
+      return isAuthed() && (
+        (hasSession() &&
+         get(/databases/$(database)/documents/sessions/$(request.auth.uid)).data.role
+           in ['admin', 'super_admin']) ||
+        (isUserRecord() &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+           in ['admin', 'super_admin'])
+      );
+    }
+
+    function isDriver() {
+      return isAuthed() &&
+             exists(/databases/$(database)/documents/agents/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function changesOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function onlyFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ── /sessions (Spark plan passcode login) ─────────────────────────────
+    // Each anonymous UID writes its own session on login, deletes on logout.
+
+    match /sessions/{uid} {
+      allow read:   if request.auth.uid == uid;
+      allow create: if request.auth.uid == uid &&
+                       onlyFields(['userId','role','displayName','createdAt']);
+      allow delete: if request.auth.uid == uid;
+      allow update: if false;
+    }
+
+    // ── /orders ───────────────────────────────────────────────────────────
+
+    match /orders/{orderId} {
+      allow read: if isStaff();
+      allow read: if isDriver() && resource.data.assignedAgentId == request.auth.uid;
+
+      allow create: if false; // Cloud Functions only
+
+      allow update: if isStaff() && changesOnly([
+        'assignedAgentId', 'assignedAgentName', 'assignedAt',
+        'status', 'batchId', 'updatedAt',
+        'fromArea', 'toArea', 'shippingFee', 'feeAssignedBy', 'feeAssignedAt'
+      ]);
+      allow update: if isDriver() &&
+                       resource.data.assignedAgentId == request.auth.uid &&
+                       changesOnly([
+                         'status', 'deliveredAt', 'failedAt',
+                         'failureReason', 'deliveryPhotoUrl', 'updatedAt'
+                       ]);
+
+      allow delete: if false;
+    }
+
+    // ── /ordersArchive ────────────────────────────────────────────────────
+
+    match /ordersArchive/{orderId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // ── /batches ──────────────────────────────────────────────────────────
+
+    match /batches/{batchId} {
+      allow read: if isStaff() || isDriver();
+      allow create: if isStaff() && onlyFields([
+        'batchId', 'agentId', 'agentName', 'orderIds',
+        'orderCount', 'status', 'createdBy', 'createdAt', 'completedAt', 'notes'
+      ]);
+      allow update: if isStaff() && changesOnly(['status', 'completedAt', 'notes']);
+      allow delete: if false;
+    }
+
+    // ── /deliveryLogs ─────────────────────────────────────────────────────
+
+    match /deliveryLogs/{logId} {
+      allow read: if isStaff();
+      allow read: if isDriver() && resource.data.agentId == request.auth.uid;
+      allow create: if isDriver() &&
+                       request.resource.data.agentId == request.auth.uid &&
+                       onlyFields([
+                         'logId', 'orderId', 'agentId', 'agentName',
+                         'batchId', 'outcome', 'failureReason',
+                         'photoUrl', 'gpsLat', 'gpsLng', 'timestamp', 'createdAt'
+                       ]);
+      allow update, delete: if false;
+    }
+
+    // ── /shippingPricing ──────────────────────────────────────────────────
+
+    match /shippingPricing/{orderId} {
+      allow read: if isStaff();
+      allow create: if isStaff() && onlyFields([
+        'orderId', 'fromArea', 'toArea', 'shippingFee',
+        'assignedBy', 'assignedAt', 'matrixVersion', 'isOverride', 'overrideReason'
+      ]);
+      allow update: if isAdmin() && changesOnly([
+        'fromArea', 'toArea', 'shippingFee',
+        'isOverride', 'overrideReason', 'assignedAt', 'assignedBy'
+      ]);
+      allow delete: if false;
+    }
+
+    // ── /config ───────────────────────────────────────────────────────────
+
+    match /config/{configId} {
+      allow read: if isAuthed();
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ── /dailyStats ───────────────────────────────────────────────────────
+    // Spark plan: Vercel webhook + admin client write stats directly.
+    // Upgrade path: when on Blaze, lock create/update to false and use triggers.
+
+    match /dailyStats/{date} {
+      allow read: if isStaff();
+      allow create: if isStaff() && onlyFields([
+        'date', 'totalOrders', 'pending', 'assigned', 'in_transit',
+        'delivered', 'failed', 'cancelled', 'totalShippingFees',
+        'avgShippingFee', 'deliverySuccessRate', 'activeAgents',
+        'firstOrderAt', 'lastUpdatedAt'
+      ]);
+      allow update: if isStaff() && changesOnly([
+        'totalOrders', 'pending', 'assigned', 'in_transit',
+        'delivered', 'failed', 'cancelled', 'totalShippingFees',
+        'avgShippingFee', 'deliverySuccessRate', 'activeAgents',
+        'firstOrderAt', 'lastUpdatedAt'
+      ]);
+      allow delete: if false;
+    }
+
+    // ── /deliveryAreas ────────────────────────────────────────────────────
+
+    match /deliveryAreas/{areaId} {
+      allow read: if isAuthed();
+      allow create, update: if isAdmin() && onlyFields([
+        'areaId', 'name', 'cluster', 'sortOrder', 'isActive', 'selfFee'
+      ]);
+      allow delete: if false;
+    }
+
+    // ── /agents ───────────────────────────────────────────────────────────
+
+    match /agents/{agentId} {
+      allow read: if isStaff();
+      allow read: if isDriver() && agentId == request.auth.uid;
+      allow create: if isAdmin() && onlyFields([
+        'agentId', 'displayName', 'phone', 'passcode',
+        'isActive', 'todayDeliveries', 'totalDeliveries', 'createdAt', 'lastSeenAt'
+      ]);
+      allow update: if isAdmin() && changesOnly([
+        'displayName', 'phone', 'isActive', 'passcode'
+      ]);
+      allow update: if isDriver() &&
+                       agentId == request.auth.uid &&
+                       changesOnly(['lastSeenAt']);
+      allow delete: if false;
+    }
+
+    // ── /users ────────────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      allow read: if isStaff();
+      allow create: if isAdmin() && onlyFields([
+        'userId', 'displayName', 'email', 'role',
+        'isActive', 'createdAt', 'lastLoginAt'
+      ]);
+      allow update: if isAdmin() && changesOnly([
+        'displayName', 'email', 'role', 'isActive', 'lastLoginAt'
+      ]);
+      allow delete: if false;
+    }
+
+    // ── /config/shippingMatrix is covered by /config above ────────────────
+
+  }
+}
